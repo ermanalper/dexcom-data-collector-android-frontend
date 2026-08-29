@@ -4,5 +4,6 @@ data class GlucoseDto (
     val value: Int,
     val timestamp: String,
     val trend: String,
-    val source: String
+    val source: String,
+    val status: String
 )
