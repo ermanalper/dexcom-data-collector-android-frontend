@@ -1,8 +1,21 @@
+import java.util.Properties
+
+// local.properties dosyasını bul ve oku
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    kotlin("kapt")
+    alias(libs.plugins.hilt)
 }
-
+hilt {
+    enableAggregatingTask = false
+}
 android {
     namespace = "com.alptrosoft.dexcom_data_collector_android_frontend"
     compileSdk = 35
@@ -16,14 +29,18 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-
+    buildFeatures {
+        buildConfig = true
+    }
     buildTypes {
+        debug {
+            val localUrl = localProperties.getProperty("LOCAL_BACKEND_URL") ?: "\"http://10.0.2.2:8080/\""
+            buildConfigField("String", "BASE_URL", localUrl)
+        }
         release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            buildConfigField("String", "BASE_URL", "\"https://KİRALIK_SERVER_IPSİ/\"")
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
     compileOptions {
@@ -36,13 +53,23 @@ android {
 }
 
 dependencies {
-
+    implementation(libs.hilt.android)
+    implementation(libs.logging.interceptor)
+    implementation(libs.javax.inject)
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.contentpager)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    add("kapt", libs.hilt.compiler)
+    implementation(libs.androidx.activity.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 }
