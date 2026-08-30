@@ -20,6 +20,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun GlucoseChartScreen(
     readings: List<GlucoseReading>,
+    horizontalGridLines: List<Int> = listOf(55, 100, 200, 300, 400),
     onLoadMore: (Long, Long) -> Unit
 ) {
     var scaleHours by remember { mutableIntStateOf(6) }
@@ -29,7 +30,6 @@ fun GlucoseChartScreen(
     var isDragging by remember { mutableStateOf(false) }
 
     val currentReadings by rememberUpdatedState(readings)
-
 
     LaunchedEffect(isDragging, viewEndTimeMillis, visibleDurationMillis, readings.isEmpty()) {
         if (isDragging) return@LaunchedEffect
@@ -43,14 +43,12 @@ fun GlucoseChartScreen(
             val earliestLoadedTime = readings.first().timestampMillis
             val latestLoadedTime = readings.last().timestampMillis
 
-            // load more past
             if (viewStartTimeMillis < earliestLoadedTime + (visibleDurationMillis * 0.2)) {
                 val fetchEnd = earliestLoadedTime
                 val fetchStart = fetchEnd - (visibleDurationMillis * 2)
                 onLoadMore(fetchStart, fetchEnd)
             }
 
-            // load more newer
             if (viewEndTimeMillis > latestLoadedTime - (visibleDurationMillis * 0.2)) {
                 val fetchStart = latestLoadedTime
                 val fetchEnd = fetchStart + (visibleDurationMillis * 2)
@@ -63,7 +61,12 @@ fun GlucoseChartScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -79,7 +82,8 @@ fun GlucoseChartScreen(
 
         Canvas(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .fillMaxHeight(0.33f)
                 .pointerInput(visibleDurationMillis) {
                     detectHorizontalDragGestures(
                         onDragStart = { isDragging = true },
@@ -112,26 +116,71 @@ fun GlucoseChartScreen(
             val viewStartTimeMillis = viewEndTimeMillis - visibleDurationMillis
             val width = size.width
             val height = size.height
-
-            // print times (00:00, 03:00, 06:00...)
-            val stepMillis = 3 * 3600000L
-            val firstTick = viewStartTimeMillis - (viewStartTimeMillis % stepMillis)
-            val textPaint = Paint().apply { color = android.graphics.Color.GRAY; textSize = 32f }
-            val formatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
-
-            for (tickTime in firstTick..viewEndTimeMillis step stepMillis) {
-                val tickX = width - ((viewEndTimeMillis - tickTime).toFloat() / visibleDurationMillis) * width
-                if (tickX in 0f..width) {
-                    drawLine(Color.LightGray, Offset(tickX, 0f), Offset(tickX, height))
-                    drawContext.canvas.nativeCanvas.drawText(
-                        formatter.format(Instant.ofEpochMilli(tickTime)), tickX, height - 10f, textPaint
-                    )
-                }
-            }
-
             val maxGlucose = 400f
 
-            // print values
+            // horizontal lines
+            val gridTextPaint = Paint().apply {
+                color = android.graphics.Color.LTGRAY
+                textSize = 28f
+                textAlign = Paint.Align.RIGHT
+            }
+
+            horizontalGridLines.forEach { lineValue ->
+                val y = height - (lineValue.toFloat() / maxGlucose) * height
+                drawLine(
+                    color = Color.LightGray.copy(alpha = 0.4f),
+                    start = Offset(0f, y),
+                    end = Offset(width, y),
+                    strokeWidth = 2f
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    lineValue.toString(), width - 10f, y - 8f, gridTextPaint
+                )
+            }
+
+            // X axis time stamps
+            val stepHours = when (scaleHours) {
+                3 -> 1
+                6 -> 2
+                12 -> 4
+                24 -> 6
+                else -> 2
+            }
+            val stepMillis = stepHours * 3600000L
+            val oneHourMillis = 3600000L
+
+            val zoneOffset = ZoneId.systemDefault().rules.getOffset(Instant.now()).totalSeconds * 1000L
+            val localTimeMillis = viewEndTimeMillis + zoneOffset
+            val nextHourLocalMillis = ((localTimeMillis / oneHourMillis) + 1) * oneHourMillis
+            val nextHourMillis = nextHourLocalMillis - zoneOffset
+
+            val textPaint = Paint().apply {
+                color = android.graphics.Color.LTGRAY
+                textSize = 32f
+                textAlign = Paint.Align.CENTER
+            }
+
+            val formatter = DateTimeFormatter.ofPattern("HH").withZone(ZoneId.systemDefault())
+
+            // ticks
+            var tickTime = nextHourMillis - stepMillis
+            while (tickTime >= viewStartTimeMillis) {
+                val tickX = width - ((viewEndTimeMillis - tickTime).toFloat() / visibleDurationMillis) * width
+                if (tickX in 0f..(width - 80f)) {
+                    drawLine(Color.LightGray.copy(alpha = 0.6f), Offset(tickX, height - 40f), Offset(tickX, height - 20f), strokeWidth = 3f)
+                    drawContext.canvas.nativeCanvas.drawText(
+                        formatter.format(Instant.ofEpochMilli(tickTime)), tickX, height - 5f, textPaint
+                    )
+                }
+                tickTime -= stepMillis
+            }
+
+            val nowX = width - 15f
+            drawLine(Color.LightGray.copy(alpha = 0.6f), Offset(nowX, height - 40f), Offset(nowX, height - 20f), strokeWidth = 3f)
+            textPaint.textAlign = Paint.Align.RIGHT
+            drawContext.canvas.nativeCanvas.drawText("Now", nowX + 10f, height - 5f, textPaint)
+
+            // Glucose readings
             readings.filter { it.timestampMillis in viewStartTimeMillis..viewEndTimeMillis }.forEach { reading ->
                 val x = width - ((viewEndTimeMillis - reading.timestampMillis).toFloat() / visibleDurationMillis) * width
                 val y = height - (reading.value / maxGlucose) * height
