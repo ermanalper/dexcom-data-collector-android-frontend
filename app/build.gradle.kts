@@ -10,6 +10,7 @@ if (localPropertiesFile.exists()) {
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.compose.compiler)
     kotlin("kapt")
     alias(libs.plugins.hilt)
 }
@@ -64,7 +65,9 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.contentpager)
-
+    implementation(libs.androidx.foundation.android)
+    implementation("androidx.compose.material3:material3:1.4.0")
+    implementation("androidx.activity:activity-compose:1.9.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

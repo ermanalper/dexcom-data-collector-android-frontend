@@ -15,6 +15,7 @@ activity = "1.9.1"
 constraintlayout = "2.2.1"
 contentpager = "1.0.0"
 retrofit = "2.11.0"
+foundationAndroid = "1.7.0"
 
 [libraries]
 androidx-activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "activity" }
@@ -34,8 +35,10 @@ androidx-activity = { group = "androidx.activity", name = "activity", version.re
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-contentpager = { group = "androidx.contentpager", name = "contentpager", version.ref = "contentpager" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+androidx-foundation-android = { group = "androidx.compose.foundation", name = "foundation-android", version.ref = "foundationAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hiltAndroid" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

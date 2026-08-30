@@ -9,8 +9,15 @@ interface GlucoseApi {
     suspend fun getLatestGlucose(): GlucoseDto
 
     @GET("api/v1/glucose/history")
+    suspend fun getGlucoseHistoryDataCountBased(
+        @Query("limit") limit: Int = 10,
+        @Query("offset") offset: Int = 0
+    ): List<GlucoseDto>
+
+    @GET("api/v1/glucose/history/by-time")
     suspend fun getGlucoseHistory(
-        @Query("limit") limit: Int = 10
+        @Query("start_time") startTime: String,
+        @Query("end_time") endTime: String? = null
     ): List<GlucoseDto>
 }
 
