@@ -41,10 +41,14 @@ fun ModernScaleSelector(
                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
                         )
                         .clickable { onOptionSelected(hours) }
-                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Text(
-                        text = if (hours == 3) "$hours Hours" else "$hours",
+                        text = when (hours) {
+                            1 -> "1 Hour"
+                            3 -> "3 Hours"
+                            else -> "$hours"
+                        },
                         color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     )

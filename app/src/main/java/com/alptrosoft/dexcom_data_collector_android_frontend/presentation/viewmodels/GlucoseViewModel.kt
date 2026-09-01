@@ -36,6 +36,39 @@ class GlucoseViewModel @Inject constructor(
             is GlucoseUiEvent.SnapToLatest -> snapToLatest()
             is GlucoseUiEvent.ChangeScale -> _state.update { it.copy(scaleHours = event.newScaleHours) }
             is GlucoseUiEvent.RealtimeDataReceived -> handleNewRealtimeData(event.newReading)
+            is GlucoseUiEvent.RefreshRequested -> handleRefresh() // YENİ
+        }
+    }
+
+    private fun handleRefresh() {
+        // 1. Ekranı anında en sağa (güncele) yasla
+        snapToLatest()
+
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val stateVal = _state.value
+
+            // 2. Tepedeki yazıyı güncellemek için en son veriyi çek
+            fetchLatestGlucose()
+
+            // 3. Aradaki boşluğu (gap) zekice hesapla ve yama yap
+            // Eğer RAM boşsa son 12 saati baz al, doluysa en son noktanın saatini bul
+            val lastKnownTimestamp = stateVal.readings.maxOfOrNull { it.timestampMillis }
+                ?: (now - 12 * 3600000L)
+
+            // API'den sadece eksik olan o aralığı (örneğin son 3 saati) iste
+            if (lastKnownTimestamp < now) {
+                repository.fetchGlucoseHistory(lastKnownTimestamp, now).onSuccess { missingData ->
+                    if (missingData.isNotEmpty()) {
+                        _state.update { currentState ->
+                            val combined = (currentState.readings + missingData)
+                                .distinctBy { it.timestampMillis }
+                                .sortedBy { it.timestampMillis }
+                            currentState.copy(readings = combined)
+                        }
+                    }
+                }
+            }
         }
     }
 

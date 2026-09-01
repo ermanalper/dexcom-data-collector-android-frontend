@@ -54,6 +54,9 @@ android {
 }
 
 dependencies {
+    implementation(platform("androidx.compose:compose-bom:2025.08.00"))
+
+    implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.hilt.android)
     implementation(libs.logging.interceptor)
     implementation(libs.javax.inject)
