@@ -26,12 +26,9 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val readings by viewModel.readings.collectAsState()
+            val state by viewModel.state.collectAsState()
 
-            GlucoseChartScreen(
-                readings = readings,
-                onLoadMore = { start, end -> viewModel.loadDataForTimeRange(start, end) }
-            )
+            GlucoseChartScreen(state = state, onEvent = viewModel::onEvent)
         }
     }
 

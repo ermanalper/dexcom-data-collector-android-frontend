@@ -48,4 +48,25 @@ class GlucoseRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun fetchFirstDataDate(): Result<Long> {
+        return try {
+            val response = api.getFirstDataDate()
+            if (response.isSuccessful) {
+                val timestampString = response.body()?.timestamp
+
+                if (timestampString != null) {
+                    // Backend'i UTC (Z) yaptığımız için Instant.parse bunu kusursuz çevirir
+                    val millis = Instant.parse(timestampString).toEpochMilli()
+                    Result.success(millis)
+                } else {
+                    Result.failure(Exception("Timestamp is null in response body"))
+                }
+            } else {
+                Result.failure(Exception("HTTP Error: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

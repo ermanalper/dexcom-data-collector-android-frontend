@@ -6,3 +6,17 @@ data class GlucoseReading (
     val trend: String,
     val status: String
 )
+fun getTrendArrow(trend: String?): String {
+    if (trend == null) {
+        return "-"
+    }
+    return when (trend) {
+        "SINGLE_UP" -> "↑"
+        "DOUBLE_UP" -> "↑↑"
+        "FORTY_FIVE_UP" -> "↗"
+        "FLAT" -> "→"
+        "FORTY_FIVE_DOWN" -> "↘"
+        "SINGLE_DOWN" -> "↓"
+        "DOUBLE_DOWN" -> "↓↓"
+        else -> "?"
+    }}
