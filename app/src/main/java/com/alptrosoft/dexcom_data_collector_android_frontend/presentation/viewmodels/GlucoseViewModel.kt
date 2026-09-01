@@ -18,8 +18,10 @@ class GlucoseViewModel @Inject constructor(
     private val _state = MutableStateFlow(GlucoseUiState())
     val state = _state.asStateFlow()
 
-    private var earliestFetchedBound: Long = System.currentTimeMillis()
+    private val fetchedTimeRanges = mutableListOf<LongRange>()
 
+    private val maxRetentionMillis = 15L * 24L * 3600000L
+    //private val maxRetentionMillis = 3600000L for debugging, 1-hr retention
     init {
         viewModelScope.launch {
             fetchOldestDataLimit() // get the first data ever recorded
@@ -29,7 +31,7 @@ class GlucoseViewModel @Inject constructor(
 
     fun onEvent(event: GlucoseUiEvent) {
         when (event) {
-            is GlucoseUiEvent.OnVisibleRangeChanged -> checkAndFetchMissingData(event.startMillis)
+            is GlucoseUiEvent.OnVisibleRangeChanged -> checkAndFetchMissingData(event.startMillis, event.endMillis)
             is GlucoseUiEvent.OnChartDragged -> handleDrag(event.newEndTimeMillis)
             is GlucoseUiEvent.SnapToLatest -> snapToLatest()
             is GlucoseUiEvent.ChangeScale -> _state.update { it.copy(scaleHours = event.newScaleHours) }
@@ -43,43 +45,73 @@ class GlucoseViewModel @Inject constructor(
         }
     }
 
-    private fun checkAndFetchMissingData(viewStartMillis: Long) {
-        val state = _state.value
-        val fetchWindow = state.scaleHours * 3600000L * 2
-        val neededStart = viewStartMillis - fetchWindow
-        val limit = state.oldestDataLimitMillis ?: 0L
+    private fun checkAndFetchMissingData(viewStartMillis: Long, viewEndMillis: Long) {
+        val limit = _state.value.oldestDataLimitMillis ?: 0L
 
-        if (neededStart < earliestFetchedBound && earliestFetchedBound > limit) {
+        // İhtiyaç duyulan görünüm penceresi
+        val neededStart = maxOf(viewStartMillis, limit)
+        val neededEnd = minOf(viewEndMillis, System.currentTimeMillis())
 
-            // fetch in 7-days big blocks
-            val minimumChunkMillis = 7L * 24L * 3600000L
+        // 1. KONTROL: Bu aralık daha önce çekilip RAM'e alındı mı?
+        val isCovered = fetchedTimeRanges.any { it.contains(neededStart) && it.contains(neededEnd) }
 
-            val theoreticalStart = earliestFetchedBound - minimumChunkMillis
+        if (isCovered) {
+            // Yeni veriye gerek yok, sadece uzaklaşan eski verileri RAM'den sil
+            pruneRam(viewStartMillis, viewEndMillis)
+            return
+        }
 
-            // if needed start is more than 7 days ago, start from there, else 7 days (minimum)
-            val targetStart = minOf(neededStart, theoreticalStart)
+        // 2. FETCH: Çekilmediyse 7 günlük bloklar (Chunk) halinde API'ye git
+        val chunkMillis = 7L * 24L * 3600000L
+        val fetchStart = maxOf(neededStart - chunkMillis, limit)
+        val fetchEnd = minOf(neededEnd + chunkMillis, System.currentTimeMillis())
 
-            val fetchStart = maxOf(targetStart, limit)
-            val fetchEnd = earliestFetchedBound
+        // Çekilen aralığı "Ağ Hafızasına" kazı ki tekrar tekrar istek atmasın
+        fetchedTimeRanges.add(fetchStart..fetchEnd)
 
-            earliestFetchedBound = fetchStart
+        viewModelScope.launch {
+            repository.fetchGlucoseHistory(fetchStart, fetchEnd).onSuccess { newData ->
+                _state.update { currentState ->
+                    val combined = (currentState.readings + newData)
+                        .distinctBy { it.timestampMillis }
+                        .sortedBy { it.timestampMillis }
 
-            viewModelScope.launch {
-                repository.fetchGlucoseHistory(fetchStart, fetchEnd).onSuccess { newData ->
-                    _state.update { currentState ->
-                        val combined = (currentState.readings + newData)
-                            .distinctBy { it.timestampMillis }
-                            .sortedBy { it.timestampMillis }
-                        currentState.copy(readings = combined)
-                    }
+                    // Veri RAM'e eklendiği an acımasızca budama yapıyoruz
+                    currentState.copy(readings = applyRamPruning(combined, viewStartMillis, viewEndMillis))
                 }
+
+                // ÇOK KRİTİK: RAM'den uçurduğumuz verilerin Ağ Hafızasını da temizlemeliyiz.
+                // Aksi halde oraya geri kaydırılırsa API'ye gitmez ve ekran boş kalır.
+                cleanupFetchedRanges(viewStartMillis, viewEndMillis)
             }
         }
+    }
+
+    private fun pruneRam(viewStartMillis: Long, viewEndMillis: Long) {
+        _state.update { currentState ->
+            currentState.copy(readings = applyRamPruning(currentState.readings, viewStartMillis, viewEndMillis))
+        }
+    }
+
+    private fun applyRamPruning(readings: List<GlucoseReading>, viewStart: Long, viewEnd: Long): List<GlucoseReading> {
+        // Ekranda bakılan yerin 15 gün öncesi ve 15 gün sonrası HARİÇ her şeyi RAM'den sil
+        val keepStart = viewStart - maxRetentionMillis
+        val keepEnd = viewEnd + maxRetentionMillis
+        return readings.filter { it.timestampMillis in keepStart..keepEnd }
+    }
+
+    private fun cleanupFetchedRanges(viewStart: Long, viewEnd: Long) {
+        val keepStart = viewStart - maxRetentionMillis
+        val keepEnd = viewEnd + maxRetentionMillis
+
+        // Ağ hafızasındaki blokları (LongRange) kontrol et.
+        // Eğer bir blok tamamen RAM'de tutulan aralığın dışına çıkmışsa, onu Ağ hafızasından da sil.
+        fetchedTimeRanges.removeAll { it.last < keepStart || it.first > keepEnd }
     }
     private fun handleDrag(newEndTimeMillis: Long) {
         val currentState = _state.value
         val now = System.currentTimeMillis()
-        val snapThreshold = 2 * 60 * 1000L // 2 dakika
+        val snapThreshold = 2 * 60 * 1000L
 
         val limit = currentState.oldestDataLimitMillis ?: 0L
         val visibleDuration = currentState.scaleHours * 3600000L
