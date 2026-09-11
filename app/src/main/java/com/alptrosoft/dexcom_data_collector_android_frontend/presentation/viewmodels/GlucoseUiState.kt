@@ -18,4 +18,5 @@ sealed class GlucoseUiEvent {
     object SnapToLatest : GlucoseUiEvent()
     data class RealtimeDataReceived(val newReading: GlucoseReading) : GlucoseUiEvent()
     object RefreshRequested : GlucoseUiEvent()
+    data class GoToDate(val dateMillis: Long) : GlucoseUiEvent()
 }

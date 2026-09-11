@@ -21,6 +21,12 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.TextButton
+import java.time.LocalDate
+import java.time.ZoneOffset
 @Composable
 fun GlucoseChartScreen(
     state: GlucoseUiState,
@@ -31,7 +37,7 @@ fun GlucoseChartScreen(
 
     var localEndTime by remember { mutableLongStateOf(state.viewEndTimeMillis) }
     var isDragging by remember { mutableStateOf(false) }
-
+    var showDatePicker by remember { mutableStateOf(false) }
     LaunchedEffect(state.viewEndTimeMillis) {
         if (!isDragging) {
             localEndTime = state.viewEndTimeMillis
@@ -245,6 +251,81 @@ fun GlucoseChartScreen(
 
                     drawCircle(color = pointColor, radius = 8f, center = Offset(x, y))
                 }
+            }
+            Button(
+                onClick = {
+                    showDatePicker = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("📅 Select Date")
+            }
+        }
+
+        if (showDatePicker) {
+            val zone = ZoneId.systemDefault()
+
+            val oldestDate = state.oldestDataLimitMillis?.let {
+                Instant.ofEpochMilli(it)
+                    .atZone(zone)
+                    .toLocalDate()
+            }
+
+            val selectableDates = remember(oldestDate) {
+                object : SelectableDates {
+
+                    override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                        val date = Instant
+                            .ofEpochMilli(utcTimeMillis)
+                            .atZone(ZoneOffset.UTC)
+                            .toLocalDate()
+
+                        val today = LocalDate.now(zone)
+
+                        return oldestDate?.let {
+                            !date.isBefore(it) && !date.isAfter(today)
+                        } ?: false
+                    }
+                }
+            }
+
+            val datePickerState = rememberDatePickerState(
+                selectableDates = selectableDates
+            )
+
+            DatePickerDialog(
+                onDismissRequest = {
+                    showDatePicker = false
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            datePickerState.selectedDateMillis?.let { selectedDateMillis ->
+                                onEvent(
+                                    GlucoseUiEvent.GoToDate(selectedDateMillis)
+                                )
+                            }
+
+                            showDatePicker = false
+                        },
+                        enabled = datePickerState.selectedDateMillis != null
+                    ) {
+                        Text("Go")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showDatePicker = false
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            ) {
+                DatePicker(
+                    state = datePickerState
+                )
             }
         }
         FloatingActionButton(

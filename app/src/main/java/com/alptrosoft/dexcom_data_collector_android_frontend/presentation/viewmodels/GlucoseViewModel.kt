@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 @HiltViewModel
 class GlucoseViewModel @Inject constructor(
     private val repository: GlucoseRepository
@@ -39,7 +42,8 @@ class GlucoseViewModel @Inject constructor(
             is GlucoseUiEvent.SnapToLatest -> snapToLatest()
             is GlucoseUiEvent.ChangeScale -> _state.update { it.copy(scaleHours = event.newScaleHours) }
             is GlucoseUiEvent.RealtimeDataReceived -> handleNewRealtimeData(event.newReading)
-            is GlucoseUiEvent.RefreshRequested -> handleRefresh() // YENİ
+            is GlucoseUiEvent.RefreshRequested -> handleRefresh()
+            is GlucoseUiEvent.GoToDate -> goToDate(event.dateMillis)
         }
     }
 
@@ -160,6 +164,51 @@ class GlucoseViewModel @Inject constructor(
             snapToLatest()
         } else {
             _state.update { it.copy(viewEndTimeMillis = boundedEndTime, isAutoScroll = false) }
+        }
+    }
+    private fun goToDate(dateMillis: Long) {
+        val currentState = _state.value
+        val zone = ZoneId.systemDefault()
+
+        // DatePicker millis'i UTC gün başlangıcı olarak gelir.
+        // Önce gerçek takvim tarihini alıyoruz.
+        val selectedDate = Instant
+            .ofEpochMilli(dateMillis)
+            .atZone(ZoneOffset.UTC)
+            .toLocalDate()
+
+        // Grafiğin göstereceği günün yerel 00:00'ı
+        val dayStartMillis = selectedDate
+            .atStartOfDay(zone)
+            .toInstant()
+            .toEpochMilli()
+
+        val visibleDurationMillis =
+            currentState.scaleHours * 3600000L
+
+        val now = System.currentTimeMillis()
+        val oldestLimit = currentState.oldestDataLimitMillis ?: dayStartMillis
+
+        // Normal durumda seçilen günün başlangıcı + görünür süre
+        var targetEndTime = dayStartMillis + visibleDurationMillis
+
+        // Geleceğe gitmesini engelle
+        if (targetEndTime > now) {
+            targetEndTime = now
+        }
+
+        // En eski veri sınırının altına düşmesini engelle
+        val minAllowedEndTime = oldestLimit + visibleDurationMillis
+
+        if (targetEndTime < minAllowedEndTime) {
+            targetEndTime = minAllowedEndTime
+        }
+
+        _state.update {
+            it.copy(
+                viewEndTimeMillis = targetEndTime,
+                isAutoScroll = false
+            )
         }
     }
 
