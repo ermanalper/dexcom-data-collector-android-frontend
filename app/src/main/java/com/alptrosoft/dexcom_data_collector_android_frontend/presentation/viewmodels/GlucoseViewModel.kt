@@ -26,6 +26,9 @@ class GlucoseViewModel @Inject constructor(
         viewModelScope.launch {
             fetchOldestDataLimit() // get the first data ever recorded
             fetchLatestGlucose()
+            repository.observeLiveGlucose().collect { liveReading ->
+                onEvent(GlucoseUiEvent.RealtimeDataReceived(liveReading))
+            }
         }
     }
 
@@ -81,11 +84,9 @@ class GlucoseViewModel @Inject constructor(
     private fun checkAndFetchMissingData(viewStartMillis: Long, viewEndMillis: Long) {
         val limit = _state.value.oldestDataLimitMillis ?: 0L
 
-        // İhtiyaç duyulan görünüm penceresi
         val neededStart = maxOf(viewStartMillis, limit)
         val neededEnd = minOf(viewEndMillis, System.currentTimeMillis())
 
-        // 1. KONTROL: Bu aralık daha önce çekilip RAM'e alındı mı?
         val isCovered = fetchedTimeRanges.any { it.contains(neededStart) && it.contains(neededEnd) }
 
         if (isCovered) {

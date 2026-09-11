@@ -132,10 +132,16 @@ fun GlucoseChartScreen(
                 }
                 val oneHourMillis = 3600000L
 
-                val zoneOffset = ZoneId.systemDefault().rules.getOffset(Instant.now()).totalSeconds * 1000L
-                val localTimeMillis = localEndTime + zoneOffset
-                val nextHourLocalMillis = ((localTimeMillis / oneHourMillis) + 1) * oneHourMillis
-                val nextHourMillis = nextHourLocalMillis - zoneOffset
+                val zone = ZoneId.systemDefault()
+                val localEnd = Instant.ofEpochMilli(localEndTime).atZone(zone)
+
+                val nextHour = localEnd
+                    .withMinute(0)
+                    .withSecond(0)
+                    .withNano(0)
+                    .plusHours(1)
+
+                val nextHourMillis = nextHour.toInstant().toEpochMilli()
 
                 val textPaint = Paint().apply {
                     color = android.graphics.Color.LTGRAY
@@ -147,7 +153,9 @@ fun GlucoseChartScreen(
 
                 var tickTime = nextHourMillis - stepMillis
                 while (tickTime >= viewStartTimeMillis) {
-                    val tickX = width - ((localEndTime - tickTime).toFloat() / visibleDurationMillis) * width
+                    val tickX =
+                        width - ((localEndTime - tickTime).toFloat() / visibleDurationMillis) * width
+
                     if (tickX in 0f..(width - 80f)) {
                         drawLine(
                             color = Color.LightGray.copy(alpha = 0.6f),
@@ -155,6 +163,7 @@ fun GlucoseChartScreen(
                             end = Offset(tickX, height - 20f),
                             strokeWidth = 3f
                         )
+
                         drawContext.canvas.nativeCanvas.drawText(
                             formatter.format(Instant.ofEpochMilli(tickTime)),
                             tickX,
@@ -162,7 +171,52 @@ fun GlucoseChartScreen(
                             textPaint
                         )
                     }
+
                     tickTime -= stepMillis
+                }
+                val dateFormatter =
+                    DateTimeFormatter.ofPattern("dd MMM").withZone(zone)
+
+                var dayTick =
+                    Instant.ofEpochMilli(viewStartTimeMillis)
+                        .atZone(zone)
+                        .toLocalDate()
+                        .plusDays(1)
+                        .atStartOfDay(zone)
+                        .toInstant()
+                        .toEpochMilli()
+
+                while (dayTick <= localEndTime) {
+                    val dayX =
+                        width - ((localEndTime - dayTick).toFloat() / visibleDurationMillis) * width
+
+                    if (dayX in 0f..width) {
+                        // Daily separator
+                        drawLine(
+                            color = Color.LightGray.copy(alpha = 0.9f),
+                            start = Offset(dayX, height - 55f),
+                            end = Offset(dayX, height - 10f),
+                            strokeWidth = 5f
+                        )
+
+                        // Date label
+                        textPaint.textAlign = Paint.Align.CENTER
+                        drawContext.canvas.nativeCanvas.drawText(
+                            dateFormatter.format(Instant.ofEpochMilli(dayTick)),
+                            dayX,
+                            height - 62f,
+                            textPaint
+                        )
+                    }
+
+                    dayTick =
+                        Instant.ofEpochMilli(dayTick)
+                            .atZone(zone)
+                            .toLocalDate()
+                            .plusDays(1)
+                            .atStartOfDay(zone)
+                            .toInstant()
+                            .toEpochMilli()
                 }
 
                 val nowX = width - ((localEndTime - System.currentTimeMillis()).toFloat() / visibleDurationMillis) * width

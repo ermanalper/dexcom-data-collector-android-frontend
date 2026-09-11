@@ -6,6 +6,9 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 import retrofit2.Response
 interface GlucoseApi {
+    companion object {
+        const val STREAM_ENDPOINT = "api/v1/glucose/stream"
+    }
     @GET("api/v1/glucose/latest")
     suspend fun getLatestGlucose(): GlucoseDto
 

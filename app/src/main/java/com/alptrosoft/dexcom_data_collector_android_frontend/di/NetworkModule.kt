@@ -3,6 +3,8 @@ import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.Glucose
 import com.alptrosoft.dexcom_data_collector_android_frontend.BuildConfig
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.GlucoseRepositoryImpl
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.GlucoseRepository
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -17,6 +19,13 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+
+    @Provides
+    @Singleton
+    fun provideGson(): Gson {
+        return GsonBuilder().create()
+    }
+
     @Provides
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
@@ -30,11 +39,11 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
+    fun provideRetrofit(okHttpClient: OkHttpClient, gson: Gson): Retrofit {
         return Retrofit.Builder()
             .baseUrl(BuildConfig.BASE_URL)
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
 
@@ -46,8 +55,12 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideGlucoseRepository(api: GlucoseApi): GlucoseRepository {
-        return GlucoseRepositoryImpl(api)
+    fun provideGlucoseRepository(
+        api: GlucoseApi,
+        okHttpClient: OkHttpClient,
+        gson: Gson
+    ): GlucoseRepository {
+        return GlucoseRepositoryImpl(api, okHttpClient, gson)
     }
 }
 

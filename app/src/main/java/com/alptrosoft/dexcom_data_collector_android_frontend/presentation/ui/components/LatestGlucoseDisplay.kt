@@ -11,16 +11,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.model.GlucoseReading
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.model.getTrendArrow
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun LatestGlucoseDisplay(
     latestReading: GlucoseReading?,
     modifier: Modifier = Modifier
 ) {
+    val backgroundColor = when (latestReading?.status?.uppercase()) {
+        "NORMAL" -> Color.Green.copy() // alpha = 0.4f gibi parametreler kullanılabilir
+        "WARNING" -> Color.Yellow.copy()
+        "CRITICAL" -> Color.Red.copy()
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    }
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        color = backgroundColor
     ) {
         Row(
             modifier = Modifier.padding(24.dp),
