@@ -22,14 +22,55 @@ class InsulinDoseViewModel @Inject constructor(
     private val fetchedTimeRanges = mutableListOf<LongRange>()
     private val maxRetentionMillis = 15L * 24L * 3600000L // 15 gün
 
+    // Ekrandaki son aralığı tutarak yeni kayıt eklendiğinde tekrar fetch yapabilmek için
+    private var lastViewStart: Long = 0L
+    private var lastViewEnd: Long = 0L
+
+    init {
+        fetchInsulinTypes()
+    }
+
     fun onEvent(event: InsulinUiEvent) {
         when (event) {
             is InsulinUiEvent.FetchDoses -> checkAndFetchMissingData(event.startMillis, event.endMillis)
             is InsulinUiEvent.ToggleVisibility -> _state.update { it.copy(showInsulin = event.show) }
+            is InsulinUiEvent.PostDose -> postDose(event.typeId, event.dose, event.timestampMillis)
+        }
+    }
+
+    private fun postDose(typeId: Int, dose: Float, timestampMillis: Long) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            repository.postInsulinDose(typeId, dose, timestampMillis).onSuccess {
+                // Yüklenme durumunu kapat
+                _state.update { it.copy(isLoading = false) }
+
+                // Başarılıysa, yeni verinin ekranda gözükmesi için cache'i temizle
+                fetchedTimeRanges.clear()
+
+                // Ve ekrandaki mevcut aralığı API'den zorla tekrar çek
+                if (lastViewStart != 0L && lastViewEnd != 0L) {
+                    checkAndFetchMissingData(lastViewStart, lastViewEnd)
+                }
+            }.onFailure { error ->
+                _state.update { it.copy(isLoading = false, error = error.message) }
+            }
+        }
+    }
+
+    private fun fetchInsulinTypes() {
+        viewModelScope.launch {
+            repository.getInsulinTypes().onSuccess { types ->
+                _state.update { it.copy(insulinTypes = types) }
+            }
         }
     }
 
     private fun checkAndFetchMissingData(viewStartMillis: Long, viewEndMillis: Long) {
+        // Mevcut bakılan aralığı post işleminden sonra kullanmak için kaydet
+        lastViewStart = viewStartMillis
+        lastViewEnd = viewEndMillis
+
         val neededStart = viewStartMillis
         val neededEnd = minOf(viewEndMillis, System.currentTimeMillis())
 

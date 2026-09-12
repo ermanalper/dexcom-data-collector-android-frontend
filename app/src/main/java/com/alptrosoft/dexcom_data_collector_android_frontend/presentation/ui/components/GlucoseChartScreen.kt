@@ -43,7 +43,7 @@ fun GlucoseChartScreen(
     var isDragging by remember { mutableStateOf(false) }
     var selectedInsulinDose by remember { mutableStateOf<InsulinDose?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
-
+    var showAddInsulinDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     var debounceJob by remember { mutableStateOf<Job?>(null) }
 
@@ -78,6 +78,12 @@ fun GlucoseChartScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = { showAddInsulinDialog = true }) {
+                        Text("+ Ekle")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
                 Text(
                     text = "İnsülin Verilerini Grafikte Göster",
                     style = MaterialTheme.typography.bodyLarge
@@ -371,6 +377,18 @@ fun GlucoseChartScreen(
             ) {
                 DatePicker(state = datePickerState)
             }
+        }
+
+        // --- İnsülin Ekleme Diyaloğu ---
+        if (showAddInsulinDialog) {
+            AddInsulinDialog(
+                insulinTypes = insulinState.insulinTypes,
+                onDismiss = { showAddInsulinDialog = false },
+                onConfirm = { typeId, dose, timestampMillis ->
+                    onInsulinEvent(InsulinUiEvent.PostDose(typeId, dose, timestampMillis))
+                    showAddInsulinDialog = false
+                }
+            )
         }
 
         FloatingActionButton(
