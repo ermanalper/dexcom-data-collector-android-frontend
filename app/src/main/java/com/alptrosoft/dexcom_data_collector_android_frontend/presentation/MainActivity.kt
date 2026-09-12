@@ -12,6 +12,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
+import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.InsulinDoseViewModel
 
 @HiltAndroidApp
 class DexcomApp : Application()
@@ -19,16 +20,23 @@ class DexcomApp : Application()
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
-    private val viewModel: GlucoseViewModel by viewModels()
+    private val glucoseViewModel: GlucoseViewModel by viewModels()
+    private val insulinViewModel: InsulinDoseViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
-            val state by viewModel.state.collectAsState()
+            val glucoseState by glucoseViewModel.state.collectAsState()
+            val insulinState by insulinViewModel.state.collectAsState()
 
-            GlucoseChartScreen(state = state, onEvent = viewModel::onEvent)
+            GlucoseChartScreen(
+                glucoseState = glucoseState,
+                insulinState = insulinState,
+                onGlucoseEvent = glucoseViewModel::onEvent,
+                onInsulinEvent = insulinViewModel::onEvent
+            )
         }
     }
 

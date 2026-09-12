@@ -1,8 +1,11 @@
 package com.alptrosoft.dexcom_data_collector_android_frontend.di
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.GlucoseApi
 import com.alptrosoft.dexcom_data_collector_android_frontend.BuildConfig
+import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.InsulinApi
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.GlucoseRepositoryImpl
+import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.InsulinRepositoryImpl
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.GlucoseRepository
+import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.InsulinRepository
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dagger.Module
@@ -62,5 +65,17 @@ object NetworkModule {
     ): GlucoseRepository {
         return GlucoseRepositoryImpl(api, okHttpClient, gson)
     }
+    @Provides
+    @Singleton
+    fun provideInsulinApi(retrofit: Retrofit): InsulinApi {
+        return retrofit.create(InsulinApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideInsulinRepository(api: InsulinApi): InsulinRepository {
+        return InsulinRepositoryImpl(api)
+    }
+
 }
 
