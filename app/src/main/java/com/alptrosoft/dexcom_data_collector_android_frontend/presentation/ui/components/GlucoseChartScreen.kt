@@ -21,7 +21,9 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.model.InsulinDose
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.model.Meal
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.InsulinUiEvent
@@ -53,6 +55,10 @@ fun GlucoseChartScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showAddInsulinDialog by remember { mutableStateOf(false) }
     var showAddMealDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+
+    // Ekle butonu menüsü için durum
+    var showAddMenu by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
     var debounceJob by remember { mutableStateOf<Job?>(null) }
@@ -79,37 +85,45 @@ fun GlucoseChartScreen(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.Center
         ) {
+            // Üst Kontroller: Ayarlar ve Ekle Butonu
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Ekle Butonu ve Açılır Menü
+                Box {
+                    IconButton(onClick = { showAddMenu = true }) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Ekle")
+                    }
+                    DropdownMenu(
+                        expanded = showAddMenu,
+                        onDismissRequest = { showAddMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("İnsülin Ekle") },
+                            onClick = {
+                                showAddMenu = false
+                                showAddInsulinDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Öğün Ekle") },
+                            onClick = {
+                                showAddMenu = false
+                                showAddMealDialog = true
+                            }
+                        )
+                    }
+                }
+
+                // Ayarlar İkonu
+                IconButton(onClick = { showSettingsDialog = true }) {
+                    Icon(imageVector = Icons.Default.Settings, contentDescription = "Ayarlar")
+                }
+            }
+
             LatestGlucoseDisplay(latestReading = glucoseState.latestReading)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // İnsülin Kontrolleri
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = { showAddInsulinDialog = true }) { Text("+ İnsülin") }
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(text = "İnsülin Göster", style = MaterialTheme.typography.bodyLarge)
-                Switch(checked = insulinState.showInsulin, onCheckedChange = { onInsulinEvent(InsulinUiEvent.ToggleVisibility(it)) })
-            }
-
-            // Öğün Kontrolleri
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = { showAddMealDialog = true }) { Text("+ Öğün") }
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(text = "Öğün Göster", style = MaterialTheme.typography.bodyLarge)
-                Switch(checked = mealState.showMeals, onCheckedChange = { onMealEvent(MealUiEvent.ToggleVisibility(it)) })
-            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -156,7 +170,6 @@ fun GlucoseChartScreen(
                             val height = size.height
                             val maxGlucose = 400f
 
-                            // Önce İnsülinleri Kontrol Et
                             if (insulinState.showInsulin) {
                                 insulinState.doses.forEach { dose ->
                                     val x = width - ((localEndTime - dose.timestampMillis).toFloat() / visibleDurationMillis) * width
@@ -174,7 +187,6 @@ fun GlucoseChartScreen(
                                 }
                             }
 
-                            // Sonra Öğünleri Kontrol Et
                             if (mealState.showMeals) {
                                 mealState.meals.forEach { meal ->
                                     val x = width - ((localEndTime - meal.timestampMillis).toFloat() / visibleDurationMillis) * width
@@ -263,7 +275,6 @@ fun GlucoseChartScreen(
                     dayTick = Instant.ofEpochMilli(dayTick).atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
                 }
 
-                // Glukozları çiz
                 glucoseState.readings.filter { it.timestampMillis in viewStartTimeMillis..localEndTime }.forEach { reading ->
                     val x = width - ((localEndTime - reading.timestampMillis).toFloat() / visibleDurationMillis) * width
                     val y = height - (reading.value / maxGlucose) * height
@@ -277,7 +288,6 @@ fun GlucoseChartScreen(
                     drawCircle(color = pointColor, radius = 8f, center = Offset(x, y))
                 }
 
-                // İnsülinleri çiz (Mor)
                 if (insulinState.showInsulin) {
                     val insulinPaint = Paint().apply {
                         color = android.graphics.Color.parseColor("#800080")
@@ -298,7 +308,6 @@ fun GlucoseChartScreen(
                     }
                 }
 
-                // Öğünleri çiz (Turuncu)
                 if (mealState.showMeals) {
                     val mealPaint = Paint().apply {
                         color = android.graphics.Color.parseColor("#FF9800")
@@ -323,11 +332,52 @@ fun GlucoseChartScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("📅 Select Date")
+                Text("📅 Tarih Seç")
             }
         }
 
-        // İnsülin Detay Dialog
+        // Ayarlar Dialogu
+        if (showSettingsDialog) {
+            AlertDialog(
+                onDismissRequest = { showSettingsDialog = false },
+                title = { Text("Grafik Ayarları") },
+                text = {
+                    Column {
+                        // İnsülin Kontrolleri
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = "İnsülin Göster", style = MaterialTheme.typography.bodyLarge)
+                            Switch(
+                                checked = insulinState.showInsulin,
+                                onCheckedChange = { onInsulinEvent(InsulinUiEvent.ToggleVisibility(it)) }
+                            )
+                        }
+
+                        Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                        // Öğün Kontrolleri
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = "Öğün Göster", style = MaterialTheme.typography.bodyLarge)
+                            Switch(
+                                checked = mealState.showMeals,
+                                onCheckedChange = { onMealEvent(MealUiEvent.ToggleVisibility(it)) }
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showSettingsDialog = false }) { Text("Kapat") }
+                }
+            )
+        }
+
         selectedInsulinDose?.let { dose ->
             val isUnknown = dose.glucoseVal == null || dose.glucoseVal == 0f
             AlertDialog(
@@ -347,7 +397,6 @@ fun GlucoseChartScreen(
             )
         }
 
-        // Öğün Detay Dialog
         selectedMeal?.let { meal ->
             val isUnknown = meal.glucoseValue == null || meal.glucoseValue == 0f
             AlertDialog(
@@ -384,9 +433,9 @@ fun GlucoseChartScreen(
                     TextButton(onClick = {
                         datePickerState.selectedDateMillis?.let { millis -> onGlucoseEvent(GlucoseUiEvent.GoToDate(millis)) }
                         showDatePicker = false
-                    }, enabled = datePickerState.selectedDateMillis != null) { Text("Go") }
+                    }, enabled = datePickerState.selectedDateMillis != null) { Text("Git") }
                 },
-                dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } }
+                dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("İptal") } }
             ) { DatePicker(state = datePickerState) }
         }
 
