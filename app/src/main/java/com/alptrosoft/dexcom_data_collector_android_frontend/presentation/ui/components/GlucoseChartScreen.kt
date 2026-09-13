@@ -458,6 +458,7 @@ fun GlucoseChartScreen(
 
         if (showAddMealDialog) {
             AddMealDialog(
+                shortcuts = mealState.shortcuts,
                 onDismiss = { showAddMealDialog = false },
                 onConfirm = { desc, timestampMillis ->
                     onMealEvent(MealUiEvent.PostMeal(desc, timestampMillis))

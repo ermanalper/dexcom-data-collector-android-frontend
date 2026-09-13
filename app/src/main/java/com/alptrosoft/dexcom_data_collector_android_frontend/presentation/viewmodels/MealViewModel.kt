@@ -15,6 +15,16 @@ import javax.inject.Inject
 class MealViewModel @Inject constructor(
     private val repository: MealRepository
 ) : ViewModel() {
+    init {
+        fetchMealShortcuts()
+    }
+    private fun fetchMealShortcuts() {
+        viewModelScope.launch {
+            repository.getMealShortcuts().onSuccess { shortcutList ->
+                _state.update { it.copy(shortcuts = shortcutList) }
+            }
+        }
+    }
 
     private val _state = MutableStateFlow(MealUiState())
     val state = _state.asStateFlow()
@@ -39,6 +49,7 @@ class MealViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true) }
             repository.postMealShortcut(title, desc).onSuccess {
                 _state.update { it.copy(isLoading = false) }
+                fetchMealShortcuts() // Yeni ekleneni listeye dahil et
             }.onFailure { error ->
                 _state.update { it.copy(isLoading = false, error = error.message) }
             }

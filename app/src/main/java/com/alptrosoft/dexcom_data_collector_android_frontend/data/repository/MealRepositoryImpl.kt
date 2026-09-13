@@ -5,6 +5,7 @@ import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.MealApi
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.dto.PostMealDto
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.dto.PostMealShortcutDto
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.model.Meal
+import com.alptrosoft.dexcom_data_collector_android_frontend.domain.model.MealShortcut
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.MealRepository
 import java.time.Instant
 import javax.inject.Inject
@@ -41,6 +42,14 @@ class MealRepositoryImpl @Inject constructor(
             val request = PostMealShortcutDto(title = title, desc = desc)
             api.postMealShortcut(request)
             Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    override suspend fun getMealShortcuts(): Result<List<MealShortcut>> {
+        return try {
+            val response = api.getMealShortcuts()
+            Result.success(response.map { MealShortcut(it.title, it.desc) })
         } catch (e: Exception) {
             Result.failure(e)
         }

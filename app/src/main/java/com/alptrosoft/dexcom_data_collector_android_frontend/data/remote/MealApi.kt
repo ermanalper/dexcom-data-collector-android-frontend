@@ -1,6 +1,7 @@
 package com.alptrosoft.dexcom_data_collector_android_frontend.data.remote
 
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.dto.MealDto
+import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.dto.MealShortcutDto
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.dto.PostMealDto
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.dto.PostMealShortcutDto
 import retrofit2.http.Body
@@ -20,4 +21,7 @@ interface MealApi {
 
     @POST("/api/v1/meal/add-meal-shortcut")
     suspend fun postMealShortcut(@Body request: PostMealShortcutDto)
+
+    @GET("/api/v1/meal/meal-shortcuts")
+    suspend fun getMealShortcuts(): List<MealShortcutDto>
 }

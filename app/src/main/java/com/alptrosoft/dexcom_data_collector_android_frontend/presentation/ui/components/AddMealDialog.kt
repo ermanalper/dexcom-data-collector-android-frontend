@@ -10,6 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.alptrosoft.dexcom_data_collector_android_frontend.domain.model.MealShortcut
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -19,6 +20,7 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMealDialog(
+    shortcuts: List<MealShortcut>,
     onDismiss: () -> Unit,
     onConfirm: (desc: String, timestampMillis: Long) -> Unit
 ) {
@@ -29,6 +31,9 @@ fun AddMealDialog(
     var selectedMinute by remember { mutableIntStateOf(Instant.now().atZone(zone).minute) }
 
     var descText by remember { mutableStateOf("") }
+
+    var shortcutDropdownExpanded by remember { mutableStateOf(false) }
+    var selectedShortcut by remember { mutableStateOf<MealShortcut?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -63,6 +68,37 @@ fun AddMealDialog(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = shortcutDropdownExpanded,
+                    onExpandedChange = { shortcutDropdownExpanded = !shortcutDropdownExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedShortcut?.title ?: "Kısayollardan Seç (İsteğe Bağlı)",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Kısayol") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = shortcutDropdownExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = shortcutDropdownExpanded,
+                        onDismissRequest = { shortcutDropdownExpanded = false }
+                    ) {
+                        shortcuts.forEach { shortcut ->
+                            DropdownMenuItem(
+                                text = { Text(shortcut.title) },
+                                onClick = {
+                                    selectedShortcut = shortcut
+                                    descText = shortcut.desc // Kısayol seçilince inputu otomatik doldur
+                                    shortcutDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
                     value = descText,
