@@ -30,6 +30,18 @@ class MealViewModel @Inject constructor(
             is MealUiEvent.FetchMeals -> checkAndFetchMissingData(event.startMillis, event.endMillis)
             is MealUiEvent.ToggleVisibility -> _state.update { it.copy(showMeals = event.show) }
             is MealUiEvent.PostMeal -> postMeal(event.desc, event.timestampMillis)
+            is MealUiEvent.PostMealShortcut -> postMealShortcut(event.title, event.desc)
+        }
+    }
+
+    private fun postMealShortcut(title: String, desc: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            repository.postMealShortcut(title, desc).onSuccess {
+                _state.update { it.copy(isLoading = false) }
+            }.onFailure { error ->
+                _state.update { it.copy(isLoading = false, error = error.message) }
+            }
         }
     }
 

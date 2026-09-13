@@ -12,3 +12,7 @@ data class PostMealDto(
     @SerializedName("desc") val desc: String,
     @SerializedName("timestamp") val timestamp: String
 )
+data class PostMealShortcutDto(
+    @SerializedName("title") val title: String,
+    @SerializedName("desc") val desc: String
+)

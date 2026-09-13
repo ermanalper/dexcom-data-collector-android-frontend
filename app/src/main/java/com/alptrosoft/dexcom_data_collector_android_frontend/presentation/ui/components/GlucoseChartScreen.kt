@@ -56,8 +56,7 @@ fun GlucoseChartScreen(
     var showAddInsulinDialog by remember { mutableStateOf(false) }
     var showAddMealDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
-
-    // Ekle butonu menüsü için durum
+    var showAddMealShortcutDialog by remember { mutableStateOf(false) }
     var showAddMenu by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
@@ -112,6 +111,13 @@ fun GlucoseChartScreen(
                             onClick = {
                                 showAddMenu = false
                                 showAddMealDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Öğün Kısayolu Ekle") },
+                            onClick = {
+                                showAddMenu = false
+                                showAddMealShortcutDialog = true
                             }
                         )
                     }
@@ -456,6 +462,15 @@ fun GlucoseChartScreen(
                 onConfirm = { desc, timestampMillis ->
                     onMealEvent(MealUiEvent.PostMeal(desc, timestampMillis))
                     showAddMealDialog = false
+                }
+            )
+        }
+        if (showAddMealShortcutDialog) {
+            AddMealShortcutDialog(
+                onDismiss = { showAddMealShortcutDialog = false },
+                onConfirm = { title, desc ->
+                    onMealEvent(MealUiEvent.PostMealShortcut(title, desc))
+                    showAddMealShortcutDialog = false
                 }
             )
         }

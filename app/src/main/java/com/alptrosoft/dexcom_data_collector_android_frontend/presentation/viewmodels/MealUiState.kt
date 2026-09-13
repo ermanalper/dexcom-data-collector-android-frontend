@@ -13,4 +13,6 @@ sealed class MealUiEvent {
     data class FetchMeals(val startMillis: Long, val endMillis: Long) : MealUiEvent()
     data class ToggleVisibility(val show: Boolean) : MealUiEvent()
     data class PostMeal(val desc: String, val timestampMillis: Long) : MealUiEvent()
+    data class PostMealShortcut(val title: String, val desc: String) : MealUiEvent()
 }
+
