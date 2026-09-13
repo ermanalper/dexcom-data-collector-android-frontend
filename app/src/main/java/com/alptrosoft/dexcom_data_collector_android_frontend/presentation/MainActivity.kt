@@ -13,6 +13,7 @@ import dagger.hilt.android.HiltAndroidApp
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.InsulinDoseViewModel
+import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.MealViewModel
 
 @HiltAndroidApp
 class DexcomApp : Application()
@@ -22,6 +23,7 @@ class MainActivity : AppCompatActivity() {
 
     private val glucoseViewModel: GlucoseViewModel by viewModels()
     private val insulinViewModel: InsulinDoseViewModel by viewModels()
+    private val mealViewModel: MealViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,12 +32,15 @@ class MainActivity : AppCompatActivity() {
         setContent {
             val glucoseState by glucoseViewModel.state.collectAsState()
             val insulinState by insulinViewModel.state.collectAsState()
+            val mealState by mealViewModel.state.collectAsState()
 
             GlucoseChartScreen(
                 glucoseState = glucoseState,
                 insulinState = insulinState,
+                mealState = mealState,
                 onGlucoseEvent = glucoseViewModel::onEvent,
-                onInsulinEvent = insulinViewModel::onEvent
+                onInsulinEvent = insulinViewModel::onEvent,
+                onMealEvent = mealViewModel::onEvent
             )
         }
     }

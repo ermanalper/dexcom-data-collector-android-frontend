@@ -2,10 +2,13 @@ package com.alptrosoft.dexcom_data_collector_android_frontend.di
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.GlucoseApi
 import com.alptrosoft.dexcom_data_collector_android_frontend.BuildConfig
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.InsulinApi
+import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.MealApi
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.GlucoseRepositoryImpl
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.InsulinRepositoryImpl
+import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.MealRepositoryImpl
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.GlucoseRepository
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.InsulinRepository
+import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.MealRepository
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dagger.Module
@@ -75,6 +78,18 @@ object NetworkModule {
     @Singleton
     fun provideInsulinRepository(api: InsulinApi): InsulinRepository {
         return InsulinRepositoryImpl(api)
+    }
+
+    @Provides
+    @Singleton
+    fun provideMealApi(retrofit: Retrofit): MealApi {
+        return retrofit.create(MealApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideMealRepository(api: MealApi): MealRepository {
+        return MealRepositoryImpl(api)
     }
 
 }

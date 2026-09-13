@@ -23,8 +23,11 @@ import java.time.format.DateTimeFormatter
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.model.InsulinDose
+import com.alptrosoft.dexcom_data_collector_android_frontend.domain.model.Meal
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.InsulinUiEvent
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.InsulinUiState
+import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.MealUiEvent
+import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.MealUiState
 import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlinx.coroutines.Job
@@ -34,16 +37,23 @@ import kotlinx.coroutines.launch
 fun GlucoseChartScreen(
     glucoseState: GlucoseUiState,
     insulinState: InsulinUiState,
+    mealState: MealUiState,
     onGlucoseEvent: (GlucoseUiEvent) -> Unit,
     onInsulinEvent: (InsulinUiEvent) -> Unit,
+    onMealEvent: (MealUiEvent) -> Unit,
     horizontalGridLines: List<Int> = listOf(55, 100, 200, 300, 400)
 ) {
     val visibleDurationMillis = glucoseState.scaleHours * 3600000L
     var localEndTime by remember { mutableLongStateOf(glucoseState.viewEndTimeMillis) }
     var isDragging by remember { mutableStateOf(false) }
+
     var selectedInsulinDose by remember { mutableStateOf<InsulinDose?>(null) }
+    var selectedMeal by remember { mutableStateOf<Meal?>(null) }
+
     var showDatePicker by remember { mutableStateOf(false) }
     var showAddInsulinDialog by remember { mutableStateOf(false) }
+    var showAddMealDialog by remember { mutableStateOf(false) }
+
     val coroutineScope = rememberCoroutineScope()
     var debounceJob by remember { mutableStateOf<Job?>(null) }
 
@@ -53,14 +63,14 @@ fun GlucoseChartScreen(
         }
     }
 
-    // Debounce mekanizması
     LaunchedEffect(localEndTime, visibleDurationMillis) {
         debounceJob?.cancel()
         debounceJob = coroutineScope.launch {
-            delay(300) // 300ms debounce
+            delay(300)
             val viewStartTimeMillis = localEndTime - visibleDurationMillis
             onGlucoseEvent(GlucoseUiEvent.OnVisibleRangeChanged(viewStartTimeMillis, localEndTime))
             onInsulinEvent(InsulinUiEvent.FetchDoses(viewStartTimeMillis, localEndTime))
+            onMealEvent(MealUiEvent.FetchMeals(viewStartTimeMillis, localEndTime))
         }
     }
 
@@ -73,25 +83,32 @@ fun GlucoseChartScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // İnsülin Kontrolleri
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = { showAddInsulinDialog = true }) {
-                        Text("+ Ekle")
-                    }
+                    Button(onClick = { showAddInsulinDialog = true }) { Text("+ İnsülin") }
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text(
-                    text = "İnsülin Verilerini Grafikte Göster",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Switch(
-                    checked = insulinState.showInsulin,
-                    onCheckedChange = { onInsulinEvent(InsulinUiEvent.ToggleVisibility(it)) }
-                )
+                Text(text = "İnsülin Göster", style = MaterialTheme.typography.bodyLarge)
+                Switch(checked = insulinState.showInsulin, onCheckedChange = { onInsulinEvent(InsulinUiEvent.ToggleVisibility(it)) })
+            }
+
+            // Öğün Kontrolleri
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = { showAddMealDialog = true }) { Text("+ Öğün") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(text = "Öğün Göster", style = MaterialTheme.typography.bodyLarge)
+                Switch(checked = mealState.showMeals, onCheckedChange = { onMealEvent(MealUiEvent.ToggleVisibility(it)) })
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -133,27 +150,45 @@ fun GlucoseChartScreen(
                             }
                         )
                     }
-                    .pointerInput(insulinState.doses, insulinState.showInsulin, localEndTime) {
+                    .pointerInput(insulinState.doses, insulinState.showInsulin, mealState.meals, mealState.showMeals, localEndTime) {
                         detectTapGestures { tapOffset ->
-                            if (!insulinState.showInsulin) return@detectTapGestures
-
                             val width = size.width
                             val height = size.height
                             val maxGlucose = 400f
 
-                            insulinState.doses.forEach { dose ->
-                                val x = width - ((localEndTime - dose.timestampMillis).toFloat() / visibleDurationMillis) * width
-                                val isUnknown = dose.glucoseVal == null || dose.glucoseVal == 0f
-                                val yGlucoseValue = if (isUnknown) 0f else dose.glucoseVal!!
+                            // Önce İnsülinleri Kontrol Et
+                            if (insulinState.showInsulin) {
+                                insulinState.doses.forEach { dose ->
+                                    val x = width - ((localEndTime - dose.timestampMillis).toFloat() / visibleDurationMillis) * width
+                                    val isUnknown = dose.glucoseVal == null || dose.glucoseVal == 0f
+                                    val yGlucoseValue = if (isUnknown) 0f else dose.glucoseVal!!
+                                    val rawY = height - (yGlucoseValue / maxGlucose) * height
+                                    val y = rawY.coerceIn(0f, height.toFloat())
 
-                                // Güvenli y hesaplaması, en alt sınır height
-                                val rawY = height - (yGlucoseValue / maxGlucose) * height
-                                val y = rawY.coerceIn(0f, height.toFloat())
+                                    val dx = tapOffset.x - x
+                                    val dy = tapOffset.y - y
+                                    if (dx * dx + dy * dy <= 2500f) {
+                                        selectedInsulinDose = dose
+                                        return@detectTapGestures
+                                    }
+                                }
+                            }
 
-                                val dx = tapOffset.x - x
-                                val dy = tapOffset.y - y
-                                if (dx * dx + dy * dy <= 2500f) {
-                                    selectedInsulinDose = dose
+                            // Sonra Öğünleri Kontrol Et
+                            if (mealState.showMeals) {
+                                mealState.meals.forEach { meal ->
+                                    val x = width - ((localEndTime - meal.timestampMillis).toFloat() / visibleDurationMillis) * width
+                                    val isUnknown = meal.glucoseValue == null || meal.glucoseValue == 0f
+                                    val yGlucoseValue = if (isUnknown) 0f else meal.glucoseValue!!
+                                    val rawY = height - (yGlucoseValue / maxGlucose) * height
+                                    val y = rawY.coerceIn(0f, height.toFloat())
+
+                                    val dx = tapOffset.x - x
+                                    val dy = tapOffset.y - y
+                                    if (dx * dx + dy * dy <= 2500f) {
+                                        selectedMeal = meal
+                                        return@detectTapGestures
+                                    }
                                 }
                             }
                         }
@@ -209,55 +244,26 @@ fun GlucoseChartScreen(
                 while (tickTime >= viewStartTimeMillis) {
                     val tickX = width - ((localEndTime - tickTime).toFloat() / visibleDurationMillis) * width
                     if (tickX in 0f..(width - 80f)) {
-                        drawLine(
-                            color = Color.LightGray.copy(alpha = 0.6f),
-                            start = Offset(tickX, height - 40f),
-                            end = Offset(tickX, height - 20f),
-                            strokeWidth = 3f
-                        )
-                        drawContext.canvas.nativeCanvas.drawText(
-                            formatter.format(Instant.ofEpochMilli(tickTime)), tickX, height - 5f, textPaint
-                        )
+                        drawLine(color = Color.LightGray.copy(alpha = 0.6f), start = Offset(tickX, height - 40f), end = Offset(tickX, height - 20f), strokeWidth = 3f)
+                        drawContext.canvas.nativeCanvas.drawText(formatter.format(Instant.ofEpochMilli(tickTime)), tickX, height - 5f, textPaint)
                     }
                     tickTime -= stepMillis
                 }
 
                 val dateFormatter = DateTimeFormatter.ofPattern("dd MMM").withZone(zone)
-                var dayTick = Instant.ofEpochMilli(viewStartTimeMillis)
-                    .atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone)
-                    .toInstant().toEpochMilli()
+                var dayTick = Instant.ofEpochMilli(viewStartTimeMillis).atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 
                 while (dayTick <= localEndTime) {
                     val dayX = width - ((localEndTime - dayTick).toFloat() / visibleDurationMillis) * width
                     if (dayX in 0f..width) {
-                        drawLine(
-                            color = Color.LightGray.copy(alpha = 0.9f),
-                            start = Offset(dayX, height - 55f),
-                            end = Offset(dayX, height - 10f),
-                            strokeWidth = 5f
-                        )
+                        drawLine(color = Color.LightGray.copy(alpha = 0.9f), start = Offset(dayX, height - 55f), end = Offset(dayX, height - 10f), strokeWidth = 5f)
                         textPaint.textAlign = Paint.Align.CENTER
-                        drawContext.canvas.nativeCanvas.drawText(
-                            dateFormatter.format(Instant.ofEpochMilli(dayTick)), dayX, height - 62f, textPaint
-                        )
+                        drawContext.canvas.nativeCanvas.drawText(dateFormatter.format(Instant.ofEpochMilli(dayTick)), dayX, height - 62f, textPaint)
                     }
-                    dayTick = Instant.ofEpochMilli(dayTick)
-                        .atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone)
-                        .toInstant().toEpochMilli()
+                    dayTick = Instant.ofEpochMilli(dayTick).atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
                 }
 
-                val nowX = width - ((localEndTime - System.currentTimeMillis()).toFloat() / visibleDurationMillis) * width
-                if (nowX in 0f..width) {
-                    drawLine(
-                        color = Color.LightGray.copy(alpha = 0.6f),
-                        start = Offset(nowX, height - 40f),
-                        end = Offset(nowX, height - 20f),
-                        strokeWidth = 3f
-                    )
-                    textPaint.textAlign = Paint.Align.RIGHT
-                    drawContext.canvas.nativeCanvas.drawText("Now", nowX - 10f, height - 5f, textPaint)
-                }
-
+                // Glukozları çiz
                 glucoseState.readings.filter { it.timestampMillis in viewStartTimeMillis..localEndTime }.forEach { reading ->
                     val x = width - ((localEndTime - reading.timestampMillis).toFloat() / visibleDurationMillis) * width
                     val y = height - (reading.value / maxGlucose) * height
@@ -271,28 +277,44 @@ fun GlucoseChartScreen(
                     drawCircle(color = pointColor, radius = 8f, center = Offset(x, y))
                 }
 
+                // İnsülinleri çiz (Mor)
                 if (insulinState.showInsulin) {
-                    val questionPaint = Paint().apply {
-                        color = android.graphics.Color.parseColor("#800080") // Mor
+                    val insulinPaint = Paint().apply {
+                        color = android.graphics.Color.parseColor("#800080")
                         textSize = 50f
                         textAlign = Paint.Align.CENTER
                         isFakeBoldText = true
                     }
-
                     insulinState.doses.filter { it.timestampMillis in viewStartTimeMillis..localEndTime }.forEach { dose ->
                         val x = width - ((localEndTime - dose.timestampMillis).toFloat() / visibleDurationMillis) * width
                         val isUnknown = dose.glucoseVal == null || dose.glucoseVal == 0f
 
                         if (isUnknown) {
-                            // Yüksekliğin en altı (0 noktası), yazının ortalanması için -10f
-                            drawContext.canvas.nativeCanvas.drawText("?", x, height - 10f, questionPaint)
+                            drawContext.canvas.nativeCanvas.drawText("?", x, height - 10f, insulinPaint)
                         } else {
-                            val yGlucoseValue = dose.glucoseVal!!
-                            val rawY = height - (yGlucoseValue / maxGlucose) * height
-                            val y = rawY.coerceIn(0f, height)
-
-                            // Glukoz noktasından (8f) daha büyük (12f) ve mor renk
+                            val y = (height - (dose.glucoseVal!! / maxGlucose) * height).coerceIn(0f, height)
                             drawCircle(color = Color(0xFF800080), radius = 12f, center = Offset(x, y))
+                        }
+                    }
+                }
+
+                // Öğünleri çiz (Turuncu)
+                if (mealState.showMeals) {
+                    val mealPaint = Paint().apply {
+                        color = android.graphics.Color.parseColor("#FF9800")
+                        textSize = 50f
+                        textAlign = Paint.Align.CENTER
+                        isFakeBoldText = true
+                    }
+                    mealState.meals.filter { it.timestampMillis in viewStartTimeMillis..localEndTime }.forEach { meal ->
+                        val x = width - ((localEndTime - meal.timestampMillis).toFloat() / visibleDurationMillis) * width
+                        val isUnknown = meal.glucoseValue == null || meal.glucoseValue == 0f
+
+                        if (isUnknown) {
+                            drawContext.canvas.nativeCanvas.drawText("?", x, height - 10f, mealPaint)
+                        } else {
+                            val y = (height - (meal.glucoseValue!! / maxGlucose) * height).coerceIn(0f, height)
+                            drawCircle(color = Color(0xFFFF9800), radius = 12f, center = Offset(x, y))
                         }
                     }
                 }
@@ -300,86 +322,74 @@ fun GlucoseChartScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Button(
-                onClick = { showDatePicker = true },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Button(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("📅 Select Date")
             }
         }
 
+        // İnsülin Detay Dialog
         selectedInsulinDose?.let { dose ->
             val isUnknown = dose.glucoseVal == null || dose.glucoseVal == 0f
-
             AlertDialog(
                 onDismissRequest = { selectedInsulinDose = null },
-                title = { Text("Insulin Dose Details") },
+                title = { Text("İnsülin Detayları") },
                 text = {
                     Column {
                         Text("Zaman: ${dose.timestamp}")
                         Text("Doz: ${dose.dose} Ünite")
                         Text("Tip: ${dose.insulinType}")
                         Spacer(modifier = Modifier.height(8.dp))
-
-                        if (isUnknown) {
-                            Text("İnsülin anındaki glukoz değeri bilinmiyor", color = Color.Red)
-                        } else {
-                            Text("Glukoz Değeri: ${dose.glucoseVal}", color = Color(0xFF800080))
-                        }
+                        if (isUnknown) Text("Glukoz değeri bilinmiyor", color = Color.Red)
+                        else Text("Glukoz Değeri: ${dose.glucoseVal}", color = Color(0xFF800080))
                     }
                 },
-                confirmButton = {
-                    TextButton(onClick = { selectedInsulinDose = null }) {
-                        Text("Kapat")
+                confirmButton = { TextButton(onClick = { selectedInsulinDose = null }) { Text("Kapat") } }
+            )
+        }
+
+        // Öğün Detay Dialog
+        selectedMeal?.let { meal ->
+            val isUnknown = meal.glucoseValue == null || meal.glucoseValue == 0f
+            AlertDialog(
+                onDismissRequest = { selectedMeal = null },
+                title = { Text("Öğün Detayları") },
+                text = {
+                    Column {
+                        Text("Zaman: ${meal.timestamp}")
+                        Text("Açıklama: ${meal.desc}")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        if (isUnknown) Text("Glukoz değeri bilinmiyor", color = Color.Red)
+                        else Text("Glukoz Değeri: ${meal.glucoseValue}", color = Color(0xFFFF9800))
                     }
-                }
+                },
+                confirmButton = { TextButton(onClick = { selectedMeal = null }) { Text("Kapat") } }
             )
         }
 
         if (showDatePicker) {
             val zone = ZoneId.systemDefault()
-            val oldestDate = glucoseState.oldestDataLimitMillis?.let {
-                Instant.ofEpochMilli(it).atZone(zone).toLocalDate()
-            }
-
+            val oldestDate = glucoseState.oldestDataLimitMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
             val selectableDates = remember(oldestDate) {
                 object : SelectableDates {
                     override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                         val date = Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate()
-                        val today = LocalDate.now(zone)
-                        return oldestDate?.let {
-                            !date.isBefore(it) && !date.isAfter(today)
-                        } ?: false
+                        return oldestDate?.let { !date.isBefore(it) && !date.isAfter(LocalDate.now(zone)) } ?: false
                     }
                 }
             }
-
             val datePickerState = rememberDatePickerState(selectableDates = selectableDates)
-
             DatePickerDialog(
                 onDismissRequest = { showDatePicker = false },
                 confirmButton = {
-                    TextButton(
-                        onClick = {
-                            datePickerState.selectedDateMillis?.let { selectedDateMillis ->
-                                onGlucoseEvent(GlucoseUiEvent.GoToDate(selectedDateMillis))
-                            }
-                            showDatePicker = false
-                        },
-                        enabled = datePickerState.selectedDateMillis != null
-                    ) {
-                        Text("Go")
-                    }
+                    TextButton(onClick = {
+                        datePickerState.selectedDateMillis?.let { millis -> onGlucoseEvent(GlucoseUiEvent.GoToDate(millis)) }
+                        showDatePicker = false
+                    }, enabled = datePickerState.selectedDateMillis != null) { Text("Go") }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
-                }
-            ) {
-                DatePicker(state = datePickerState)
-            }
+                dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } }
+            ) { DatePicker(state = datePickerState) }
         }
 
-        // --- İnsülin Ekleme Diyaloğu ---
         if (showAddInsulinDialog) {
             AddInsulinDialog(
                 insulinTypes = insulinState.insulinTypes,
@@ -391,18 +401,23 @@ fun GlucoseChartScreen(
             )
         }
 
+        if (showAddMealDialog) {
+            AddMealDialog(
+                onDismiss = { showAddMealDialog = false },
+                onConfirm = { desc, timestampMillis ->
+                    onMealEvent(MealUiEvent.PostMeal(desc, timestampMillis))
+                    showAddMealDialog = false
+                }
+            )
+        }
+
         FloatingActionButton(
             onClick = { onGlucoseEvent(GlucoseUiEvent.RefreshRequested) },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(24.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary
         ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Refresh Data"
-            )
+            Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh Data")
         }
     }
 }
