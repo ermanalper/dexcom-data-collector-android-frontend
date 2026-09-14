@@ -54,6 +54,9 @@ android {
 }
 
 dependencies {
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
+    implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation(platform("androidx.compose:compose-bom:2025.08.00"))
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
     implementation("androidx.compose.material:material-icons-extended")
