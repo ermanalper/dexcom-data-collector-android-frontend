@@ -32,15 +32,15 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 
 @Composable
 fun CompareChartsScreen(
-    // Üst grafik için bağımsız instance'lar
     topGlucoseVM: GlucoseViewModel = hiltViewModel(key = "top_glucose"),
     topInsulinVM: InsulinDoseViewModel = hiltViewModel(key = "top_insulin"),
     topMealVM: MealViewModel = hiltViewModel(key = "top_meal"),
 
-    // Alt grafik için bağımsız instance'lar
     bottomGlucoseVM: GlucoseViewModel = hiltViewModel(key = "bottom_glucose"),
     bottomInsulinVM: InsulinDoseViewModel = hiltViewModel(key = "bottom_insulin"),
     bottomMealVM: MealViewModel = hiltViewModel(key = "bottom_meal")
@@ -53,19 +53,32 @@ fun CompareChartsScreen(
     val bottomInsulinState by bottomInsulinVM.state.collectAsState()
     val bottomMealState by bottomMealVM.state.collectAsState()
 
+    var topEndTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var bottomEndTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    var isTimeSynced by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = "Grafik Karşılaştırma",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Grafik Karşılaştırma",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            IconButton(onClick = { showSettingsDialog = true }) {
+                Icon(imageVector = Icons.Default.Settings, contentDescription = "Ayarlar")
+            }
+        }
 
-        // Ortak Scale Selector (Üst grafiğin değerini baz alır ve her iki VM'i de günceller)
         ModernScaleSelector(
             options = listOf(1, 3, 6, 12, 24),
             selectedOption = topGlucoseState.scaleHours,
@@ -81,8 +94,19 @@ fun CompareChartsScreen(
             glucoseReadings = topGlucoseState.readings,
             insulinDoses = topInsulinState.doses,
             meals = topMealState.meals,
+            showInsulin = topInsulinState.showInsulin,
+            showMeals = topMealState.showMeals,
             scaleHours = topGlucoseState.scaleHours,
             oldestDataLimitMillis = topGlucoseState.oldestDataLimitMillis,
+            endTimeMillis = topEndTime,
+            onEndTimeChange = { newEnd ->
+                // Delta (değişim miktarı) hesapla ve eşitliyse alt grafiğe de aynı değişimi uygula
+                val delta = newEnd - topEndTime
+                topEndTime = newEnd
+                if (isTimeSynced) {
+                    bottomEndTime += delta
+                }
+            },
             onFetchData = { start, end ->
                 topGlucoseVM.onEvent(GlucoseUiEvent.OnVisibleRangeChanged(start, end))
                 topInsulinVM.onEvent(InsulinUiEvent.FetchDoses(start, end))
@@ -98,14 +122,102 @@ fun CompareChartsScreen(
             glucoseReadings = bottomGlucoseState.readings,
             insulinDoses = bottomInsulinState.doses,
             meals = bottomMealState.meals,
+            showInsulin = bottomInsulinState.showInsulin,
+            showMeals = bottomMealState.showMeals,
             scaleHours = bottomGlucoseState.scaleHours,
             oldestDataLimitMillis = bottomGlucoseState.oldestDataLimitMillis,
+            endTimeMillis = bottomEndTime,
+            onEndTimeChange = { newEnd ->
+                // Delta (değişim miktarı) hesapla ve eşitliyse üst grafiğe de aynı değişimi uygula
+                val delta = newEnd - bottomEndTime
+                bottomEndTime = newEnd
+                if (isTimeSynced) {
+                    topEndTime += delta
+                }
+            },
             onFetchData = { start, end ->
                 bottomGlucoseVM.onEvent(GlucoseUiEvent.OnVisibleRangeChanged(start, end))
                 bottomInsulinVM.onEvent(InsulinUiEvent.FetchDoses(start, end))
                 bottomMealVM.onEvent(MealUiEvent.FetchMeals(start, end))
             },
             modifier = Modifier.weight(1f)
+        )
+    }
+
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            title = { Text("Karşılaştırma Ayarları") },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "Saati Eşitle", style = MaterialTheme.typography.bodyLarge)
+                        Switch(
+                            checked = isTimeSynced,
+                            onCheckedChange = { synced ->
+                                isTimeSynced = synced
+                                if (synced) {
+                                    val zone = ZoneId.systemDefault()
+                                    val visibleDuration = topGlucoseState.scaleHours * 3600000L
+
+                                    // Üst grafiği KENDİ gününün başlangıcına eşitle
+                                    val topStartMillis = topEndTime - visibleDuration
+                                    val topStartLocalDate = Instant.ofEpochMilli(topStartMillis).atZone(zone).toLocalDate()
+                                    val topDayStartMillis = topStartLocalDate.atStartOfDay(zone).toInstant().toEpochMilli()
+                                    topEndTime = topDayStartMillis + visibleDuration
+
+                                    // Alt grafiği KENDİ gününün başlangıcına eşitle
+                                    val bottomStartMillis = bottomEndTime - visibleDuration
+                                    val bottomStartLocalDate = Instant.ofEpochMilli(bottomStartMillis).atZone(zone).toLocalDate()
+                                    val bottomDayStartMillis = bottomStartLocalDate.atStartOfDay(zone).toInstant().toEpochMilli()
+                                    bottomEndTime = bottomDayStartMillis + visibleDuration
+                                }
+                            }
+                        )
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "İnsülin Göster", style = MaterialTheme.typography.bodyLarge)
+                        Switch(
+                            checked = topInsulinState.showInsulin,
+                            onCheckedChange = { show ->
+                                topInsulinVM.onEvent(InsulinUiEvent.ToggleVisibility(show))
+                                bottomInsulinVM.onEvent(InsulinUiEvent.ToggleVisibility(show))
+                            }
+                        )
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "Öğün Göster", style = MaterialTheme.typography.bodyLarge)
+                        Switch(
+                            checked = topMealState.showMeals,
+                            onCheckedChange = { show ->
+                                topMealVM.onEvent(MealUiEvent.ToggleVisibility(show))
+                                bottomMealVM.onEvent(MealUiEvent.ToggleVisibility(show))
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettingsDialog = false }) { Text("Kapat") }
+            }
         )
     }
 }
@@ -116,13 +228,16 @@ fun ComparisonChart(
     glucoseReadings: List<GlucoseReading>,
     insulinDoses: List<InsulinDose>,
     meals: List<Meal>,
+    showInsulin: Boolean,
+    showMeals: Boolean,
     scaleHours: Int,
     oldestDataLimitMillis: Long?,
+    endTimeMillis: Long,
+    onEndTimeChange: (Long) -> Unit,
     onFetchData: (start: Long, end: Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val visibleDurationMillis = scaleHours * 3600000L
-    var localEndTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var isDragging by remember { mutableStateOf(false) }
 
     var showDatePicker by remember { mutableStateOf(false) }
@@ -132,12 +247,14 @@ fun ComparisonChart(
     val coroutineScope = rememberCoroutineScope()
     var debounceJob by remember { mutableStateOf<Job?>(null) }
 
-    LaunchedEffect(localEndTime, visibleDurationMillis) {
+    val currentEndTime by rememberUpdatedState(endTimeMillis)
+
+    LaunchedEffect(endTimeMillis, visibleDurationMillis) {
         debounceJob?.cancel()
         debounceJob = coroutineScope.launch {
             delay(300)
-            val viewStartTimeMillis = localEndTime - visibleDurationMillis
-            onFetchData(viewStartTimeMillis, localEndTime)
+            val viewStartTimeMillis = endTimeMillis - visibleDurationMillis
+            onFetchData(viewStartTimeMillis, endTimeMillis)
         }
     }
 
@@ -154,7 +271,8 @@ fun ComparisonChart(
                         onHorizontalDrag = { change, dragAmount ->
                             change.consume()
                             val millisPerPixel = visibleDurationMillis / size.width
-                            var newEndTime = localEndTime - (dragAmount * millisPerPixel).toLong()
+                            var newEndTime = currentEndTime - (dragAmount * millisPerPixel).toLong()
+
                             val limit = oldestDataLimitMillis ?: 0L
                             val minAllowedEndTime = limit + visibleDurationMillis
 
@@ -164,49 +282,53 @@ fun ComparisonChart(
                             if (newEndTime > System.currentTimeMillis()) {
                                 newEndTime = System.currentTimeMillis()
                             }
-                            localEndTime = newEndTime
+                            onEndTimeChange(newEndTime)
                         }
                     )
                 }
-                .pointerInput(insulinDoses, meals, localEndTime) {
+                .pointerInput(insulinDoses, meals, showInsulin, showMeals) {
                     detectTapGestures { tapOffset ->
                         val width = size.width
                         val height = size.height
                         val maxGlucose = 400f
 
-                        insulinDoses.forEach { dose ->
-                            val x = width - ((localEndTime - dose.timestampMillis).toFloat() / visibleDurationMillis) * width
-                            val isUnknown = dose.glucoseVal == null || dose.glucoseVal == 0f
-                            val yGlucoseValue = if (isUnknown) 0f else dose.glucoseVal!!
-                            val rawY = height - (yGlucoseValue / maxGlucose) * height
-                            val y = rawY.coerceIn(0f, height.toFloat())
+                        if (showInsulin) {
+                            insulinDoses.forEach { dose ->
+                                val x = width - ((currentEndTime - dose.timestampMillis).toFloat() / visibleDurationMillis) * width
+                                val isUnknown = dose.glucoseVal == null || dose.glucoseVal == 0f
+                                val yGlucoseValue = if (isUnknown) 0f else dose.glucoseVal!!
+                                val rawY = height - (yGlucoseValue / maxGlucose) * height
+                                val y = rawY.coerceIn(0f, height.toFloat())
 
-                            val dx = tapOffset.x - x
-                            val dy = tapOffset.y - y
-                            if (dx * dx + dy * dy <= 2500f) {
-                                selectedInsulinDose = dose
-                                return@detectTapGestures
+                                val dx = tapOffset.x - x
+                                val dy = tapOffset.y - y
+                                if (dx * dx + dy * dy <= 2500f) {
+                                    selectedInsulinDose = dose
+                                    return@detectTapGestures
+                                }
                             }
                         }
 
-                        meals.forEach { meal ->
-                            val x = width - ((localEndTime - meal.timestampMillis).toFloat() / visibleDurationMillis) * width
-                            val isUnknown = meal.glucoseValue == null || meal.glucoseValue == 0f
-                            val yGlucoseValue = if (isUnknown) 0f else meal.glucoseValue!!
-                            val rawY = height - (yGlucoseValue / maxGlucose) * height
-                            val y = rawY.coerceIn(0f, height.toFloat())
+                        if (showMeals) {
+                            meals.forEach { meal ->
+                                val x = width - ((currentEndTime - meal.timestampMillis).toFloat() / visibleDurationMillis) * width
+                                val isUnknown = meal.glucoseValue == null || meal.glucoseValue == 0f
+                                val yGlucoseValue = if (isUnknown) 0f else meal.glucoseValue!!
+                                val rawY = height - (yGlucoseValue / maxGlucose) * height
+                                val y = rawY.coerceIn(0f, height.toFloat())
 
-                            val dx = tapOffset.x - x
-                            val dy = tapOffset.y - y
-                            if (dx * dx + dy * dy <= 2500f) {
-                                selectedMeal = meal
-                                return@detectTapGestures
+                                val dx = tapOffset.x - x
+                                val dy = tapOffset.y - y
+                                if (dx * dx + dy * dy <= 2500f) {
+                                    selectedMeal = meal
+                                    return@detectTapGestures
+                                }
                             }
                         }
                     }
                 }
         ) {
-            val viewStartTimeMillis = localEndTime - visibleDurationMillis
+            val viewStartTimeMillis = endTimeMillis - visibleDurationMillis
             val width = size.width
             val height = size.height
             val maxGlucose = 400f
@@ -225,9 +347,7 @@ fun ComparisonChart(
                     end = Offset(width, y),
                     strokeWidth = 2f
                 )
-                drawContext.canvas.nativeCanvas.drawText(
-                    lineValue.toString(), width - 10f, y - 8f, gridTextPaint
-                )
+                drawContext.canvas.nativeCanvas.drawText(lineValue.toString(), width - 10f, y - 8f, gridTextPaint)
             }
 
             val stepMillis = when (scaleHours) {
@@ -240,7 +360,7 @@ fun ComparisonChart(
             }
 
             val zone = ZoneId.systemDefault()
-            val localEnd = Instant.ofEpochMilli(localEndTime).atZone(zone)
+            val localEnd = Instant.ofEpochMilli(endTimeMillis).atZone(zone)
             val nextHourMillis = localEnd.withMinute(0).withSecond(0).withNano(0).plusHours(1).toInstant().toEpochMilli()
 
             val textPaint = Paint().apply {
@@ -252,7 +372,7 @@ fun ComparisonChart(
             val formatter = DateTimeFormatter.ofPattern("HH:mm").withZone(zone)
             var tickTime = nextHourMillis - stepMillis
             while (tickTime >= viewStartTimeMillis) {
-                val tickX = width - ((localEndTime - tickTime).toFloat() / visibleDurationMillis) * width
+                val tickX = width - ((endTimeMillis - tickTime).toFloat() / visibleDurationMillis) * width
                 if (tickX in 0f..(width - 80f)) {
                     drawLine(color = Color.LightGray.copy(alpha = 0.6f), start = Offset(tickX, height - 40f), end = Offset(tickX, height - 20f), strokeWidth = 3f)
                     drawContext.canvas.nativeCanvas.drawText(formatter.format(Instant.ofEpochMilli(tickTime)), tickX, height - 5f, textPaint)
@@ -263,8 +383,8 @@ fun ComparisonChart(
             val dateFormatter = DateTimeFormatter.ofPattern("dd MMM").withZone(zone)
             var dayTick = Instant.ofEpochMilli(viewStartTimeMillis).atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 
-            while (dayTick <= localEndTime) {
-                val dayX = width - ((localEndTime - dayTick).toFloat() / visibleDurationMillis) * width
+            while (dayTick <= endTimeMillis) {
+                val dayX = width - ((endTimeMillis - dayTick).toFloat() / visibleDurationMillis) * width
                 if (dayX in 0f..width) {
                     drawLine(color = Color.LightGray.copy(alpha = 0.9f), start = Offset(dayX, height - 55f), end = Offset(dayX, height - 10f), strokeWidth = 5f)
                     textPaint.textAlign = Paint.Align.CENTER
@@ -273,8 +393,8 @@ fun ComparisonChart(
                 dayTick = Instant.ofEpochMilli(dayTick).atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
             }
 
-            glucoseReadings.filter { it.timestampMillis in viewStartTimeMillis..localEndTime }.forEach { reading ->
-                val x = width - ((localEndTime - reading.timestampMillis).toFloat() / visibleDurationMillis) * width
+            glucoseReadings.filter { it.timestampMillis in viewStartTimeMillis..endTimeMillis }.forEach { reading ->
+                val x = width - ((endTimeMillis - reading.timestampMillis).toFloat() / visibleDurationMillis) * width
                 val y = height - (reading.value / maxGlucose) * height
                 val pointColor = when (reading.status.uppercase()) {
                     "NORMAL" -> Color.Green
@@ -285,39 +405,43 @@ fun ComparisonChart(
                 drawCircle(color = pointColor, radius = 8f, center = Offset(x, y))
             }
 
-            val insulinPaint = Paint().apply {
-                color = android.graphics.Color.parseColor("#800080")
-                textSize = 50f
-                textAlign = Paint.Align.CENTER
-                isFakeBoldText = true
-            }
-            insulinDoses.filter { it.timestampMillis in viewStartTimeMillis..localEndTime }.forEach { dose ->
-                val x = width - ((localEndTime - dose.timestampMillis).toFloat() / visibleDurationMillis) * width
-                val isUnknown = dose.glucoseVal == null || dose.glucoseVal == 0f
+            if (showInsulin) {
+                val insulinPaint = Paint().apply {
+                    color = android.graphics.Color.parseColor("#800080")
+                    textSize = 50f
+                    textAlign = Paint.Align.CENTER
+                    isFakeBoldText = true
+                }
+                insulinDoses.filter { it.timestampMillis in viewStartTimeMillis..endTimeMillis }.forEach { dose ->
+                    val x = width - ((endTimeMillis - dose.timestampMillis).toFloat() / visibleDurationMillis) * width
+                    val isUnknown = dose.glucoseVal == null || dose.glucoseVal == 0f
 
-                if (isUnknown) {
-                    drawContext.canvas.nativeCanvas.drawText("?", x, height - 10f, insulinPaint)
-                } else {
-                    val y = (height - (dose.glucoseVal!! / maxGlucose) * height).coerceIn(0f, height)
-                    drawCircle(color = Color(0xFF800080), radius = 12f, center = Offset(x, y))
+                    if (isUnknown) {
+                        drawContext.canvas.nativeCanvas.drawText("?", x, height - 10f, insulinPaint)
+                    } else {
+                        val y = (height - (dose.glucoseVal!! / maxGlucose) * height).coerceIn(0f, height)
+                        drawCircle(color = Color(0xFF800080), radius = 12f, center = Offset(x, y))
+                    }
                 }
             }
 
-            val mealPaint = Paint().apply {
-                color = android.graphics.Color.parseColor("#FF9800")
-                textSize = 50f
-                textAlign = Paint.Align.CENTER
-                isFakeBoldText = true
-            }
-            meals.filter { it.timestampMillis in viewStartTimeMillis..localEndTime }.forEach { meal ->
-                val x = width - ((localEndTime - meal.timestampMillis).toFloat() / visibleDurationMillis) * width
-                val isUnknown = meal.glucoseValue == null || meal.glucoseValue == 0f
+            if (showMeals) {
+                val mealPaint = Paint().apply {
+                    color = android.graphics.Color.parseColor("#FF9800")
+                    textSize = 50f
+                    textAlign = Paint.Align.CENTER
+                    isFakeBoldText = true
+                }
+                meals.filter { it.timestampMillis in viewStartTimeMillis..endTimeMillis }.forEach { meal ->
+                    val x = width - ((endTimeMillis - meal.timestampMillis).toFloat() / visibleDurationMillis) * width
+                    val isUnknown = meal.glucoseValue == null || meal.glucoseValue == 0f
 
-                if (isUnknown) {
-                    drawContext.canvas.nativeCanvas.drawText("?", x, height - 10f, mealPaint)
-                } else {
-                    val y = (height - (meal.glucoseValue!! / maxGlucose) * height).coerceIn(0f, height)
-                    drawCircle(color = Color(0xFFFF9800), radius = 12f, center = Offset(x, y))
+                    if (isUnknown) {
+                        drawContext.canvas.nativeCanvas.drawText("?", x, height - 10f, mealPaint)
+                    } else {
+                        val y = (height - (meal.glucoseValue!! / maxGlucose) * height).coerceIn(0f, height)
+                        drawCircle(color = Color(0xFFFF9800), radius = 12f, center = Offset(x, y))
+                    }
                 }
             }
         }
@@ -350,7 +474,7 @@ fun ComparisonChart(
                         datePickerState.selectedDateMillis?.let { millis ->
                             val selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
                             val dayStartMillis = selectedDate.atStartOfDay(zone).toInstant().toEpochMilli()
-                            localEndTime = dayStartMillis + visibleDurationMillis
+                            onEndTimeChange(dayStartMillis + visibleDurationMillis)
                         }
                         showDatePicker = false
                     }, enabled = datePickerState.selectedDateMillis != null) { Text("Git") }
