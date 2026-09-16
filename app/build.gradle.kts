@@ -35,13 +35,31 @@ android {
     }
     buildTypes {
         debug {
-            val localUrl = localProperties.getProperty("LOCAL_BACKEND_URL") ?: "\"http://10.0.2.2:8080/\""
+            val localUrl = localProperties.getProperty("DNS_ADRESS")
+                ?: "\"http://10.0.2.2:8080/\""
+
+            val apiKey = localProperties.getProperty("API_KEY")
+                ?: "\"\""
+
             buildConfigField("String", "BASE_URL", localUrl)
+            buildConfigField("String", "API_KEY", apiKey)
         }
+
         release {
-            buildConfigField("String", "BASE_URL", "\"https://KİRALIK_SERVER_IPSİ/\"")
+            val localUrl = localProperties.getProperty("DNS_ADRESS")
+                ?: "\"http://10.0.2.2:8080/\""
+
+            val apiKey = localProperties.getProperty("API_KEY")
+                ?: "\"\""
+
+            buildConfigField("String", "BASE_URL", localUrl)
+            buildConfigField("String", "API_KEY", apiKey)
+
             isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {

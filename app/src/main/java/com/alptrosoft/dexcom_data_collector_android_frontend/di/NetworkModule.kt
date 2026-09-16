@@ -20,11 +20,23 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
-
+import okhttp3.Interceptor
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+    @Provides
+    @Singleton
+    fun provideAuthInterceptor(): Interceptor {
+        return Interceptor { chain ->
+            val originalRequest = chain.request()
+            // Her isteğin header'ına API anahtarımızı basıyoruz
+            val newRequest = originalRequest.newBuilder()
+                .addHeader("X-API-Key", BuildConfig.API_KEY)
+                .build()
+            chain.proceed(newRequest)
+        }
+    }
 
     @Provides
     @Singleton
@@ -34,11 +46,12 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun provideOkHttpClient(authInterceptor: Interceptor): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
         }
         return OkHttpClient.Builder()
+            .addInterceptor(authInterceptor)
             .addInterceptor(logging)
             .build()
     }

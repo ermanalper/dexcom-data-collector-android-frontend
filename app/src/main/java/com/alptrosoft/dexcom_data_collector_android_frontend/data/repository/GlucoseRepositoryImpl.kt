@@ -1,6 +1,7 @@
 package com.alptrosoft.dexcom_data_collector_android_frontend.data.repository
 
 import android.util.Log
+import com.alptrosoft.dexcom_data_collector_android_frontend.BuildConfig
 import com.alptrosoft.dexcom_data_collector_android_frontend.BuildConfig.BASE_URL
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.mapper.toDomain
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.GlucoseApi
@@ -92,9 +93,9 @@ class GlucoseRepositoryImpl @Inject constructor(
     }
 
     override fun observeLiveGlucose(): Flow<GlucoseReading> = callbackFlow {
-        // Hardcode URL yerine kurala uygun sabit kullanımı
         val request = Request.Builder()
             .url(BASE_URL + GlucoseApi.STREAM_ENDPOINT)
+            .addHeader("X-API-Key", BuildConfig.API_KEY)
             .build()
 
         val sseClient = okHttpClient.newBuilder()
