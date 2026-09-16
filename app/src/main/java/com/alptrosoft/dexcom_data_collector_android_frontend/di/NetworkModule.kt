@@ -1,11 +1,14 @@
 package com.alptrosoft.dexcom_data_collector_android_frontend.di
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.GlucoseApi
 import com.alptrosoft.dexcom_data_collector_android_frontend.BuildConfig
+import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.AlarmApi
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.InsulinApi
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.MealApi
+import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.AlarmRepositoryImpl
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.GlucoseRepositoryImpl
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.InsulinRepositoryImpl
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.repository.MealRepositoryImpl
+import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.AlarmRepository
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.GlucoseRepository
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.InsulinRepository
 import com.alptrosoft.dexcom_data_collector_android_frontend.domain.repository.MealRepository
@@ -79,7 +82,10 @@ object NetworkModule {
         okHttpClient: OkHttpClient,
         gson: Gson
     ): GlucoseRepository {
-        return GlucoseRepositoryImpl(api, okHttpClient, gson)
+        val sseClient = okHttpClient.newBuilder()
+            .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+        return GlucoseRepositoryImpl(api, sseClient, gson)
     }
     @Provides
     @Singleton
@@ -104,6 +110,16 @@ object NetworkModule {
     fun provideMealRepository(api: MealApi): MealRepository {
         return MealRepositoryImpl(api)
     }
+    @Provides
+    @Singleton
+    fun provideAlarmApi(retrofit: Retrofit): AlarmApi {
+        return retrofit.create(AlarmApi::class.java)
+    }
 
+    @Provides
+    @Singleton
+    fun provideAlarmRepository(api: AlarmApi): AlarmRepository {
+        return AlarmRepositoryImpl(api)
+    }
 }
 
