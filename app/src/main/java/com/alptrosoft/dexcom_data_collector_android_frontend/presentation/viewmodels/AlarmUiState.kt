@@ -11,4 +11,5 @@ data class AlarmUiState(
 sealed class AlarmUiEvent {
     object FetchAlarms : AlarmUiEvent()
     data class AcknowledgeAlarm(val id: String) : AlarmUiEvent()
+    object AcknowledgeAllAlarms : AlarmUiEvent()
 }

@@ -13,4 +13,7 @@ interface AlarmApi {
 
     @PATCH("/api/v1/alarm/ack-alarm")
     suspend fun acknowledgeAlarm(@Query("alarm_id") alarmId: String)
+
+    @PATCH("/api/v1/alarm/ack-all-alarms")
+    suspend fun acknowledgeAllAlarms()
 }

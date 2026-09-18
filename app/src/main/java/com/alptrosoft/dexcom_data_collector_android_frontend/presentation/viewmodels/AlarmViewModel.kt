@@ -26,6 +26,7 @@ class AlarmViewModel @Inject constructor(
         when (event) {
             is AlarmUiEvent.FetchAlarms -> fetchAlarms()
             is AlarmUiEvent.AcknowledgeAlarm -> acknowledgeAlarm(event.id)
+            is AlarmUiEvent.AcknowledgeAllAlarms -> acknowledgeAllAlarms()
         }
     }
 
@@ -43,7 +44,13 @@ class AlarmViewModel @Inject constructor(
     private fun acknowledgeAlarm(id: String) {
         viewModelScope.launch {
             repository.acknowledgeAlarm(id).onSuccess {
-                // Kapatınca listeyi backend'den tazeleyelim (veya listeden local olarak da silebilirsin)
+                fetchAlarms()
+            }
+        }
+    }
+    private fun acknowledgeAllAlarms() {
+        viewModelScope.launch {
+            repository.acknowledgeAllAlarms().onSuccess {
                 fetchAlarms()
             }
         }

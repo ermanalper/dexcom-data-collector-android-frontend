@@ -31,4 +31,13 @@ class AlarmRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun acknowledgeAllAlarms(): Result<Unit> {
+        return try {
+            api.acknowledgeAllAlarms()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
