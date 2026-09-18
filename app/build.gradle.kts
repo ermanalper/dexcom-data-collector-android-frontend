@@ -40,9 +40,12 @@ android {
 
             val apiKey = localProperties.getProperty("API_KEY")
                 ?: "\"\""
+            val clientName = localProperties.getProperty("CLIENT_NAME")
+                ?: "\"UNKNOWN-ANDROID-CLIENT\""
 
             buildConfigField("String", "BASE_URL", localUrl)
             buildConfigField("String", "API_KEY", apiKey)
+            buildConfigField("String", "CLIENT_NAME", clientName)
         }
 
         release {
@@ -51,10 +54,12 @@ android {
 
             val apiKey = localProperties.getProperty("API_KEY")
                 ?: "\"\""
+            val clientName = localProperties.getProperty("CLIENT_NAME")
+                ?: "\"UNKNOWN-ANDROID-CLIENT\""
 
             buildConfigField("String", "BASE_URL", localUrl)
             buildConfigField("String", "API_KEY", apiKey)
-
+            buildConfigField("String", "CLIENT_NAME", clientName)
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

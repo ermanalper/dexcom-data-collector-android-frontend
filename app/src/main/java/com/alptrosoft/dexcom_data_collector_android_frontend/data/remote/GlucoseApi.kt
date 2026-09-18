@@ -1,5 +1,6 @@
 package com.alptrosoft.dexcom_data_collector_android_frontend.data.remote
 
+import com.alptrosoft.dexcom_data_collector_android_frontend.BuildConfig
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.dto.FirstDataDateResponse
 import com.alptrosoft.dexcom_data_collector_android_frontend.data.remote.dto.GlucoseDto
 import retrofit2.http.GET
@@ -7,7 +8,7 @@ import retrofit2.http.Query
 import retrofit2.Response
 interface GlucoseApi {
     companion object {
-        const val STREAM_ENDPOINT = "api/v1/events/stream"
+        const val STREAM_ENDPOINT = "api/v1/events/stream?client_name=" + BuildConfig.CLIENT_NAME
     }
     @GET("api/v1/glucose/latest")
     suspend fun getLatestGlucose(): GlucoseDto

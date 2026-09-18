@@ -14,24 +14,37 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.activity.compose.setContent
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Notifications
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.alptrosoft.dexcom_data_collector_android_frontend.domain.manager.HeartbeatManager
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.ui.components.AlarmsScreen
+import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.ui.components.ClientsScreen
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.ui.components.CompareChartsScreen
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.ui.components.GlucoseChartScreen
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.AlarmViewModel
+import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.ClientViewModel
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.GlucoseViewModel
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.InsulinDoseViewModel
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.MealViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 
 @HiltAndroidApp
-class DexcomApp : Application()
+class DexcomApp : Application() {
 
+    @Inject
+    lateinit var heartbeatManager: HeartbeatManager
+
+    override fun onCreate() {
+        super.onCreate()
+        heartbeatManager.startHeartbeat()
+    }
+}
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
@@ -39,6 +52,7 @@ class MainActivity : AppCompatActivity() {
     private val insulinViewModel: InsulinDoseViewModel by viewModels()
     private val mealViewModel: MealViewModel by viewModels()
     private val alarmViewModel: AlarmViewModel by viewModels()
+    private val clientViewModel: ClientViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -88,6 +102,18 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                             )
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Default.Devices, contentDescription = "Cihazlar") },
+                                label = { Text("Cihazlar") },
+                                selected = currentRoute == "clients",
+                                onClick = {
+                                    navController.navigate("clients") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
 
                         }
 
@@ -122,6 +148,13 @@ class MainActivity : AppCompatActivity() {
                             AlarmsScreen(
                                 state = alarmState,
                                 onEvent = alarmViewModel::onEvent
+                            )
+                        }
+                        composable("clients") {
+                            val clientState by clientViewModel.state.collectAsState()
+                            ClientsScreen(
+                                state = clientState,
+                                onEvent = clientViewModel::onEvent
                             )
                         }
                     }

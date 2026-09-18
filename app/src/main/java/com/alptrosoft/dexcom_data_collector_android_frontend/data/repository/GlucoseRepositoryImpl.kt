@@ -23,6 +23,8 @@ import java.io.IOException
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class GlucoseRepositoryImpl @Inject constructor(
     private val api: GlucoseApi,
@@ -103,37 +105,63 @@ class GlucoseRepositoryImpl @Inject constructor(
             .apply { interceptors().clear() }
             .build()
 
-        val listener = object : EventSourceListener() {
-            override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
-                if (type == "new_glucose") {
-                    try {
-                        val jsonMap = gson.fromJson(data, Map::class.java)
+        var currentEventSource: EventSource? = null
 
-                        val timeString = jsonMap["timestamp"] as String
-                        val isoString = timeString.replace(" ", "T")
-                        val timestampMillis = Instant.parse(isoString).toEpochMilli()
+        // Bağlantıyı kuran ve koptuğunda kendini tekrar çağıran fonksiyon
+        fun connect() {
+            val listener = object : EventSourceListener() {
+                override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+                    if (type == "new_glucose") {
+                        try {
+                            val jsonMap = gson.fromJson(data, Map::class.java)
 
-                        val newReading = GlucoseReading(
-                            value = (jsonMap["value"] as Double).toInt(),
-                            timestampMillis = timestampMillis,
-                            trend = jsonMap["trend"] as String,
-                            status = jsonMap["status"] as String
-                        )
-                        Log.d("LIVE_GLUCOSE", "Timestamp: ${newReading.timestampMillis} Value: ${newReading.value}")
-                        trySend(newReading)
+                            val timeString = jsonMap["timestamp"] as String
+                            val isoString = timeString.replace(" ", "T")
+                            val timestampMillis = Instant.parse(isoString).toEpochMilli()
 
-                    } catch (e: Exception) {
-                        Log.e("LIVE_GLUCOSE", "Error: ${e.message}")
+                            val newReading = GlucoseReading(
+                                value = (jsonMap["value"] as Double).toInt(),
+                                timestampMillis = timestampMillis,
+                                trend = jsonMap["trend"] as String,
+                                status = jsonMap["status"] as String
+                            )
+                            Log.d("LIVE_GLUCOSE", "Timestamp: ${newReading.timestampMillis} Value: ${newReading.value}")
+                            trySend(newReading)
+
+                        } catch (e: Exception) {
+                            Log.e("LIVE_GLUCOSE", "Error: ${e.message}")
+                        }
+                    }
+                }
+
+                override fun onClosed(eventSource: EventSource) {
+                    Log.d("LIVE_GLUCOSE", "SSE Bağlantısı sunucu tarafından kapatıldı (Heartbeat timeout vb). Yeniden bağlanılıyor...")
+                    launch {
+                        delay(5000L) // Sunucuyu floodlamamak için 5 saniye bekle
+                        connect()
+                    }
+                }
+
+                override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
+                    Log.e("LIVE_GLUCOSE", "SSE Bağlantı koptu veya hata: ${t?.message}. Yeniden bağlanılıyor...")
+                    launch {
+                        delay(5000L)
+                        connect()
                     }
                 }
             }
 
-            override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                Log.e("LIVE_GLUCOSE", "SSE Bağlantı koptu veya hata: ${t?.message}")
-            }
+            // Eğer halihazırda açık bir source varsa iptal et (Leak önleme)
+            currentEventSource?.cancel()
+            currentEventSource = EventSources.createFactory(sseClient).newEventSource(request, listener)
         }
 
-        val eventSource = EventSources.createFactory(sseClient).newEventSource(request, listener)
-        awaitClose { eventSource.cancel() }
+        // Akış (Flow) toplanmaya başladığında ilk bağlantıyı tetikle
+        connect()
+
+        awaitClose {
+            // Flow iptal edildiğinde (örn: ViewModel temizlendiğinde) bağlantıyı tamamen kapat
+            currentEventSource?.cancel()
+        }
     }
 }
