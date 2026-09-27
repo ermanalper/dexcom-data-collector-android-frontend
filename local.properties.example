@@ -1,0 +1,15 @@
+```properties
+# Android SDK location
+sdk.dir=D\:\\Android\\sdk
+
+# Backend endpoints
+LOCAL_BACKEND_URL="http://10.0.2.2:8000/"
+SERVER_IP="http://YOUR_SERVER_IP:8000/
+DNS_ADRESS="https://your-domain.example.com/"
+
+# Backend authentication
+API_KEY="YOUR_API_KEY"
+
+# Client identification
+CLIENT_NAME="ANDROID-CLIENT"
+```
