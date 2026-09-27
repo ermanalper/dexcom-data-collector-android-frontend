@@ -1,6 +1,10 @@
 # Dexcom Data Collector - Android Frontend
 
-An advanced Android client built to interface with the Dexcom data backend. This application not only visualizes real-time glucose metrics but also acts as a central control hub for all devices connected to the backend's Server-Sent Events (SSE) tunnel.
+An advanced Android client built to interface seamlessly with the [Glucose Data Collector Backend](https://github.com/ermanalper/glucose-data-collector). This application not only visualizes real-time glucose metrics but also acts as a central control hub for all devices connected to the backend's Server-Sent Events (SSE) tunnel.
+
+## 🔗 Backend Repository
+The core backend service, API endpoints, and SSE tunneling logic required for this frontend can be found here: 
+👉 **[glucose-data-collector](https://github.com/ermanalper/glucose-data-collector)**
 
 ## Features
 * **Glucose Visualization:** Renders real-time glucose data from the backend into interactive charts.
@@ -15,9 +19,13 @@ An advanced Android client built to interface with the Dexcom data backend. This
 * **Network:** Server-Sent Events (SSE) & REST API
 * **Hardware Integration:** Remote protocol triggering for ESP32 and other IoT clients
 
-* # Dexcom Data Collector - Android Frontend
+# Dexcom Data Collector - Android Frontend
 
-Dexcom veri backend'i ile entegre çalışan gelişmiş bir Android istemcisi. Bu uygulama glukoz metriklerini gerçek zamanlı olarak görselleştirmenin yanı sıra, sunucunun Server-Sent Events (SSE) tüneline bağlı tüm cihazlar için merkezi bir kontrol noktası olarak çalışır.
+[Glucose Data Collector Backend](https://github.com/ermanalper/glucose-data-collector) ile tam entegre çalışan gelişmiş bir Android istemcisi. Bu uygulama glukoz metriklerini gerçek zamanlı olarak görselleştirmenin yanı sıra, sunucunun Server-Sent Events (SSE) tüneline bağlı tüm cihazlar için merkezi bir kontrol noktası olarak çalışır.
+
+## 🔗 Backend Deposu
+Bu frontend uygulamasının çalışması için gereken temel backend servisi, API uç noktaları ve SSE tünel yapısına bu repodan ulaşabilirsiniz:
+👉 **[glucose-data-collector](https://github.com/ermanalper/glucose-data-collector)**
 
 ## Özellikler
 * **Glukoz Görselleştirme:** Backend'den gelen eşzamanlı glukoz verilerini etkileşimli grafiklere döker.
