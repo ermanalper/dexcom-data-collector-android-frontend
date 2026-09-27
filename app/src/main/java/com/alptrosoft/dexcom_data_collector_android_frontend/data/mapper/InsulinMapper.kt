@@ -16,7 +16,6 @@ fun InsulinDoseDto.toDomainModel(): InsulinDose {
             Instant.parse(this.timestamp).toEpochMilli()
         } catch (e: Exception) {
             try {
-                // Eğer Z (UTC) ibaresi olmadan geliyorsa
                 LocalDateTime.parse(this.timestamp).atZone(ZoneOffset.UTC).toInstant().toEpochMilli()
             } catch (e2: Exception) {
                 0L

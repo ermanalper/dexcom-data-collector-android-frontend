@@ -36,7 +36,6 @@ object NetworkModule {
     fun provideAuthInterceptor(): Interceptor {
         return Interceptor { chain ->
             val originalRequest = chain.request()
-            // Her isteğin header'ına API anahtarımızı basıyoruz
             val newRequest = originalRequest.newBuilder()
                 .addHeader("X-API-Key", BuildConfig.API_KEY)
                 .build()

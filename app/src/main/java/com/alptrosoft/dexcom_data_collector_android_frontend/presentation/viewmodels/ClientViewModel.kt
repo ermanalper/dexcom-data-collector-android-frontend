@@ -43,7 +43,6 @@ class ClientViewModel @Inject constructor(
     private fun testClient(clientName: String) {
         viewModelScope.launch {
             repository.testClient(clientName).onSuccess {
-                // Test başarılı, isterseniz state üzerinde güncellemeler yapabilirsiniz
             }.onFailure { error ->
                 _state.update { it.copy(error = error.message) }
             }

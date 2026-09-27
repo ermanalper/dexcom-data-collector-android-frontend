@@ -53,7 +53,6 @@ fun AddInsulinDialog(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Tarih (Yukarıda, küçük)
                 val dateFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy")
                 Text(
                     text = selectedDate.format(dateFormatter),
@@ -200,6 +199,7 @@ fun AddInsulinDialog(
     }
 }
 
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WheelPicker(
@@ -207,12 +207,18 @@ fun WheelPicker(
     initialIndex: Int,
     onScrollFinished: (Int) -> Unit
 ) {
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    // 1. DÜZELTME: İlk açılışta initialIndex'in ortaya gelmesi için başlangıç noktasından 1 çıkarıyoruz.
+    // Ayrıca sonsuz döngüde yukarı doğru kaydırmayı en baştan itibaren yapabilmek için
+    // count'un bir katını (örn: count * 50) başlangıca ekliyoruz.
+    val startOffset = (count * 50) + initialIndex - 1
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = startOffset)
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
     LaunchedEffect(listState.isScrollInProgress) {
         if (!listState.isScrollInProgress) {
-            val centerItem = listState.firstVisibleItemIndex
+            // 2. DÜZELTME: UI'da merkezdeki eleman firstVisibleItemIndex + 1 olduğu için,
+            // state'e de ilk görünenin 1 fazlasını (merkezdekinin kendisini) gönderiyoruz.
+            val centerItem = listState.firstVisibleItemIndex + 1
             onScrollFinished(centerItem % count)
         }
     }

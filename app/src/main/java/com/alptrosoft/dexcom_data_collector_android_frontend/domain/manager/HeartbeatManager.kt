@@ -15,19 +15,16 @@ import javax.inject.Singleton
 class HeartbeatManager @Inject constructor(
     private val api: ClientApi
 ) {
-    // Uygulama ayakta olduğu sürece yaşayacak olan Coroutine Scope
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     fun startHeartbeat() {
         scope.launch {
-            while (isActive) { // Scope aktif olduğu sürece döngüye devam et
+            while (isActive) {
                 try {
                     api.sendHeartbeat(BuildConfig.CLIENT_NAME)
                 } catch (e: Exception) {
-                    // Bağlantı kopması veya sunucu hatası durumunda uygulama çökmez.
-                    // İstersen buraya Log ekleyebilirsin: Log.e("Heartbeat", "Error: ${e.message}")
+
                 }
-                delay(30_000L) // 30 saniye bekle
             }
         }
     }

@@ -50,7 +50,7 @@ class GlucoseRepositoryImpl @Inject constructor(
             val response = api.getLatestGlucose()
             Result.success(response.toDomain())
         } catch (e: Exception) {
-            Result.failure(mapException(e)) // Sızıntı kapatıldı
+            Result.failure(mapException(e))
         }
     }
 
@@ -94,6 +94,7 @@ class GlucoseRepositoryImpl @Inject constructor(
         }
     }
 
+    // NOTE: THESE ARE STREAM-RELATED THINGS. THEY SHOULD BE SEPARATED FROM "GLUCOSE" LATER.
     override fun observeLiveGlucose(): Flow<GlucoseReading> = callbackFlow {
         val request = Request.Builder()
             .url(BASE_URL + GlucoseApi.STREAM_ENDPOINT)
@@ -107,7 +108,7 @@ class GlucoseRepositoryImpl @Inject constructor(
 
         var currentEventSource: EventSource? = null
 
-        // Bağlantıyı kuran ve koptuğunda kendini tekrar çağıran fonksiyon
+
         fun connect() {
             val listener = object : EventSourceListener() {
                 override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
@@ -135,15 +136,15 @@ class GlucoseRepositoryImpl @Inject constructor(
                 }
 
                 override fun onClosed(eventSource: EventSource) {
-                    Log.d("LIVE_GLUCOSE", "SSE Bağlantısı sunucu tarafından kapatıldı (Heartbeat timeout vb). Yeniden bağlanılıyor...")
+                    Log.d("LIVE_GLUCOSE", "SSE connection is closed by the server (Heartbeat timeout etc.). Reconnecting...")
                     launch {
-                        delay(5000L) // Sunucuyu floodlamamak için 5 saniye bekle
+                        delay(5000L)
                         connect()
                     }
                 }
 
                 override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                    Log.e("LIVE_GLUCOSE", "SSE Bağlantı koptu veya hata: ${t?.message}. Yeniden bağlanılıyor...")
+                    Log.e("LIVE_GLUCOSE", "SSE Connection is lost: ${t?.message}. Reconnecting...")
                     launch {
                         delay(5000L)
                         connect()
@@ -151,16 +152,14 @@ class GlucoseRepositoryImpl @Inject constructor(
                 }
             }
 
-            // Eğer halihazırda açık bir source varsa iptal et (Leak önleme)
+
             currentEventSource?.cancel()
             currentEventSource = EventSources.createFactory(sseClient).newEventSource(request, listener)
         }
 
-        // Akış (Flow) toplanmaya başladığında ilk bağlantıyı tetikle
         connect()
 
         awaitClose {
-            // Flow iptal edildiğinde (örn: ViewModel temizlendiğinde) bağlantıyı tamamen kapat
             currentEventSource?.cancel()
         }
     }

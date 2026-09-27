@@ -17,9 +17,6 @@ import androidx.compose.ui.unit.dp
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.GlucoseUiState
 import com.alptrosoft.dexcom_data_collector_android_frontend.presentation.viewmodels.GlucoseUiEvent
 import kotlinx.coroutines.delay
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
@@ -34,7 +31,18 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
+fun formatTimestamp(timestamp: String): String {
+    val formatter = DateTimeFormatter
+        .ofPattern("dd MMMM yyyy HH:mm", Locale("tr", "TR"))
+        .withZone(ZoneId.of("Europe/Istanbul"))
+
+    return formatter.format(Instant.parse(timestamp))
+}
 @Composable
 fun GlucoseChartScreen(
     glucoseState: GlucoseUiState,
@@ -61,6 +69,8 @@ fun GlucoseChartScreen(
 
     val coroutineScope = rememberCoroutineScope()
     var debounceJob by remember { mutableStateOf<Job?>(null) }
+
+
 
     LaunchedEffect(glucoseState.viewEndTimeMillis) {
         if (!isDragging) {
@@ -391,7 +401,7 @@ fun GlucoseChartScreen(
                 title = { Text("İnsülin Detayları") },
                 text = {
                     Column {
-                        Text("Zaman: ${dose.timestamp}")
+                        Text("Zaman: ${formatTimestamp(dose.timestamp)}")
                         Text("Doz: ${dose.dose} Ünite")
                         Text("Tip: ${dose.insulinType}")
                         Spacer(modifier = Modifier.height(8.dp))
@@ -410,7 +420,7 @@ fun GlucoseChartScreen(
                 title = { Text("Öğün Detayları") },
                 text = {
                     Column {
-                        Text("Zaman: ${meal.timestamp}")
+                        Text("Zaman: ${formatTimestamp(meal.timestamp)}")
                         Text("Açıklama: ${meal.desc}")
                         Spacer(modifier = Modifier.height(8.dp))
                         if (isUnknown) Text("Glukoz değeri bilinmiyor", color = Color.Red)

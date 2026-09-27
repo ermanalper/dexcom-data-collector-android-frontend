@@ -7,6 +7,8 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 import retrofit2.Response
 interface GlucoseApi {
+    // NOTE: stream endpoint should actually be separated from "Glucose".
+
     companion object {
         const val STREAM_ENDPOINT = "api/v1/events/stream?client_name=" + BuildConfig.CLIENT_NAME
     }
